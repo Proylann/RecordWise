@@ -1,0 +1,16 @@
+export const appRoutes = {
+  register: '/register',
+  login: '/login',
+  dashboard: '/dashboard',
+  requestRecord: '/request-record',
+  recordsQueue: '/records-queue',
+  reportProblem: '/report-problem',
+  secretaryRequests: '/secretary-requests',
+  processRequest: '/process-request',
+  secretaryReports: '/secretary-reports',
+  archiveRecords: '/archive-records',
+  certificateIncidentArchives: '/certificate-incident-archives',
+  barangayRecordArchives: '/barangay-record-archives',
+  activityLogs: '/activity-logs',
+  profile: '/profile',
+} as const
