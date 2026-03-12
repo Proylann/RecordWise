@@ -3,10 +3,18 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import './ChainWise.css'
 import ActivityLogsPage from './pages/ActivityLogs'
+import AssistantPage from './pages/Assistant'
 import BarangayRecordArchivesPage from './pages/BarangayRecordArchives'
 import CertificateIncidentArchivesPage from './pages/CertificateIncidentArchives'
 import DashboardPage from './pages/Dashboard'
 import LoginPage from './pages/Login'
+import AdminActivitiesPage from './pages/admin/AdminActivities'
+import AdminArchivesPage from './pages/admin/AdminArchives'
+import AdminIncidentsPage from './pages/admin/AdminIncidents'
+import AdminLogsPage from './pages/admin/AdminLogs'
+import AdminRequestsPage from './pages/admin/AdminRequests'
+import AdminResidentsPage from './pages/admin/AdminResidents'
+import AdminStaffPage from './pages/admin/AdminStaff'
 import ProcessRequestPage from './pages/ProcessRequest'
 import ProfilePage from './pages/Profile'
 import RecordsQueuePage from './pages/RecordsQueue'
@@ -19,7 +27,7 @@ import SubmitRecordPage from './pages/SubmitRecord'
 import { useAuth } from './context/AuthContext'
 import { appRoutes } from './lib/routes'
 
-type AccessRole = 'resident' | 'secretary'
+type AccessRole = 'resident' | 'secretary' | 'admin'
 
 function RequireAuth({ children, role }: { children: ReactElement; role?: AccessRole }) {
   const { isAuthenticated, user } = useAuth()
@@ -33,6 +41,10 @@ function RequireAuth({ children, role }: { children: ReactElement; role?: Access
   }
 
   if (role === 'secretary' && user?.role !== 'secretary' && user?.role !== 'admin') {
+    return <Navigate to={appRoutes.dashboard} replace />
+  }
+
+  if (role === 'admin' && user?.role !== 'admin') {
     return <Navigate to={appRoutes.dashboard} replace />
   }
 
@@ -51,6 +63,14 @@ function AppFrame() {
   const location = useLocation()
   const workspaceRoutes: string[] = [
     appRoutes.dashboard,
+    appRoutes.assistant,
+    appRoutes.adminResidents,
+    appRoutes.adminStaff,
+    appRoutes.adminRequests,
+    appRoutes.adminIncidents,
+    appRoutes.adminLogs,
+    appRoutes.adminActivities,
+    appRoutes.adminArchives,
     appRoutes.requestRecord,
     appRoutes.recordsQueue,
     appRoutes.reportProblem,
@@ -87,10 +107,74 @@ function AppFrame() {
             }
           />
           <Route
+            path={appRoutes.assistant}
+            element={
+              <RequireAuth>
+                <AssistantPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path={appRoutes.dashboard}
             element={
               <RequireAuth>
                 <DashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={appRoutes.adminResidents}
+            element={
+              <RequireAuth role="admin">
+                <AdminResidentsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={appRoutes.adminStaff}
+            element={
+              <RequireAuth role="admin">
+                <AdminStaffPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={appRoutes.adminRequests}
+            element={
+              <RequireAuth role="admin">
+                <AdminRequestsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={appRoutes.adminIncidents}
+            element={
+              <RequireAuth role="admin">
+                <AdminIncidentsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={appRoutes.adminLogs}
+            element={
+              <RequireAuth role="admin">
+                <AdminLogsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={appRoutes.adminActivities}
+            element={
+              <RequireAuth role="admin">
+                <AdminActivitiesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path={appRoutes.adminArchives}
+            element={
+              <RequireAuth role="admin">
+                <AdminArchivesPage />
               </RequireAuth>
             }
           />

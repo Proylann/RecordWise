@@ -15,6 +15,7 @@ const documentTypeOptions = [
 
 type CreatedRecordResponse = {
   record_id: string
+  blockchain_tx_hash?: string | null
 }
 
 function SubmitRecordPage() {
@@ -82,7 +83,9 @@ function SubmitRecordPage() {
 
       setStatus({
         type: 'success',
-        message: `Document ${data.record_id} uploaded successfully.`,
+        message: data.blockchain_tx_hash
+          ? `Archive record ${data.record_id} was stored on-chain. Transaction: ${data.blockchain_tx_hash}.`
+          : `Archive record ${data.record_id} was uploaded successfully.`,
       })
       resetForm()
     } catch (error) {
@@ -199,7 +202,7 @@ function SubmitRecordPage() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-2xl border border-[#c9d6ec] bg-white px-5 py-3 text-sm font-semibold text-[#2f6df6] transition hover:border-[#2f6df6] hover:bg-[#f5f9ff]"
+                    className="interactive-button rounded-2xl border border-[#c9d6ec] bg-white px-5 py-3 text-sm font-semibold text-[#2f6df6] transition hover:border-[#2f6df6] hover:bg-[#f5f9ff]"
                   >
                     Choose File
                   </button>
@@ -212,7 +215,7 @@ function SubmitRecordPage() {
                           fileInputRef.current.value = ''
                         }
                       }}
-                      className="rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-5 py-3 text-sm font-semibold text-[#64748b] transition hover:bg-white"
+                      className="interactive-button rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] px-5 py-3 text-sm font-semibold text-[#64748b] transition hover:bg-white"
                     >
                       Remove
                     </button>
@@ -237,7 +240,7 @@ function SubmitRecordPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#2f6df6] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(47,109,246,0.24)] transition hover:-translate-y-0.5 hover:bg-[#245de0] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                className="interactive-button-strong inline-flex items-center justify-center gap-2 rounded-2xl bg-[#2f6df6] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(47,109,246,0.24)] transition hover:-translate-y-0.5 hover:bg-[#245de0] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
               >
                 {isSubmitting ? 'Uploading...' : 'Upload Document'}
               </button>
@@ -247,7 +250,7 @@ function SubmitRecordPage() {
                   resetForm()
                   setStatus({ type: 'idle', message: '' })
                 }}
-                className="rounded-2xl border border-[#dbe3f0] bg-[#eef2f7] px-5 py-3.5 text-sm font-semibold text-[#64748b] transition hover:bg-white"
+                className="interactive-button rounded-2xl border border-[#dbe3f0] bg-[#eef2f7] px-5 py-3.5 text-sm font-semibold text-[#64748b] transition hover:bg-white"
               >
                 Cancel
               </button>

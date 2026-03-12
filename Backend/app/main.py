@@ -9,17 +9,28 @@ from random import choice, randint
 from uuid import uuid4
 
 import jwt
+from eth_account import Account
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
+from web3 import Web3
 
+from app.assistant import ensure_assistant_model, generate_assistant_reply, get_assistant_status, train_assistant_model
 from app.config import get_settings
 from app.database import get_database, ping_database
 from app.schemas import (
+    ActivitySummaryResponse,
     ActivityLogResponse,
+    AssistantChatRequest,
+    AssistantChatResponse,
+    AssistantStatusResponse,
+    AssistantTrainResponse,
+    AdminUserCreateRequest,
+    AdminUserResponse,
+    AdminUserUpdateRequest,
     ArchiveVerificationResponse,
     AuditEntryResponse,
     AuthResponse,
@@ -66,6 +77,12 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Session-Expires-At"],
 )
+
+
+@app.on_event("startup")
+def startup_tasks() -> None:
+    ensure_default_admin_account()
+    ensure_assistant_model()
 
 
 @app.exception_handler(RequestValidationError)
@@ -125,6 +142,51 @@ def get_activity_logs_collection():
     collection.create_index("actor_email")
     collection.create_index("timestamp")
     return collection
+
+
+def ensure_default_admin_account() -> None:
+    users = get_users_collection()
+    admin_email = "admin@recordwise.com"
+    admin_password = "@Password12345"
+    existing = users.find_one({"email": admin_email})
+    now = datetime.now(UTC)
+
+    if existing:
+        updates: dict = {"updated_at": now}
+        if get_user_role(existing) != "admin":
+            updates["role"] = "admin"
+        if existing.get("archived"):
+            updates["archived"] = False
+            updates["archived_at"] = None
+        users.update_one({"_id": existing["_id"]}, {"$set": updates})
+        return
+
+    users.insert_one(
+        {
+            "first_name": "System",
+            "middle_name": "Admin",
+            "last_name": "RecordWise",
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "purok": None,
+            "role": "admin",
+            "mfa_enabled": False,
+            "mfa_secret": None,
+            "mfa_pending_secret": None,
+            "archived": False,
+            "archived_at": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+    )
+    log_activity(
+        actor_email=admin_email,
+        actor_role="admin",
+        action="Seeded Admin Account",
+        target_collection="users",
+        target_id=admin_email,
+        details="Default admin account prepared for administrative access.",
+    )
 
 
 def get_sessions_collection():
@@ -190,6 +252,22 @@ def serialize_user(document: dict) -> UserResponse:
         purok=document.get("purok"),
         mfa_enabled=bool(document.get("mfa_enabled")),
         role=get_user_role(document),
+    )
+
+
+def serialize_admin_user(document: dict) -> AdminUserResponse:
+    return AdminUserResponse(
+        email=document["email"],
+        first_name=document.get("first_name"),
+        middle_name=document.get("middle_name"),
+        last_name=document.get("last_name"),
+        purok=document.get("purok"),
+        mfa_enabled=bool(document.get("mfa_enabled")),
+        role=get_user_role(document),
+        archived=bool(document.get("archived", False)),
+        created_at=isoformat(as_utc(document["created_at"])) if document.get("created_at") else None,
+        updated_at=isoformat(as_utc(document["updated_at"])) if document.get("updated_at") else None,
+        archived_at=isoformat(as_utc(document["archived_at"])) if document.get("archived_at") else None,
     )
 
 
@@ -289,6 +367,9 @@ def serialize_security_record(document: dict) -> SecurityRecordResponse:
         source_id=document.get("source_id"),
         previous_hash=document.get("previous_hash"),
         record_hash=document.get("record_hash", ""),
+        blockchain_tx_hash=document.get("blockchain_tx_hash"),
+        blockchain_contract_address=document.get("blockchain_contract_address"),
+        blockchain_network_id=document.get("blockchain_network_id"),
         insights=serialize_record_insights(document),
         audit_trail=[serialize_audit_entry(entry) for entry in document.get("audit_trail", [])],
     )
@@ -315,6 +396,10 @@ VALID_RISK_LEVELS = {"Low", "Medium", "High", "Critical"}
 VALID_REQUEST_STATUSES = {"Pending", "In Progress", "Ready To Pickup", "Claimed", "Declined"}
 VALID_REPORT_STATUSES = {"Open", "In Review", "Resolved", "Declined"}
 VALID_REPORT_URGENCY = {"Low", "Medium", "High", "Urgent"}
+SPECIAL_WEEKLY_REQUEST_LIMITS = {
+    "Business Clearance": 1,
+}
+DEFAULT_WEEKLY_REQUEST_LIMIT = 2
 CATEGORY_KEYWORDS = {
     "Barangay Clearance": ["clearance", "permit", "certificate"],
     "Certificate Request": ["certificate", "indigency", "residency", "request"],
@@ -361,6 +446,79 @@ async def save_upload_file(upload: UploadFile | None, folder_name: str) -> tuple
 def build_record_hash(payload: dict) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def get_blockchain_contract_details() -> tuple[list[dict], str]:
+    artifact_path = Path(__file__).resolve().parent.parent.parent / "blockchain" / "build" / "contracts" / "BarangayRecords.json"
+    if not artifact_path.exists():
+        raise RuntimeError("BarangayRecords artifact not found. Compile and migrate the Truffle contract first.")
+
+    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    contract_address = settings.blockchain_contract_address
+    if not contract_address:
+        network_config = artifact.get("networks", {}).get(str(settings.ganache_network_id))
+        if not network_config or not network_config.get("address"):
+            raise RuntimeError(
+                f"BarangayRecords is not deployed for network {settings.ganache_network_id}. Run Truffle migrate first."
+            )
+        contract_address = str(network_config["address"])
+
+    abi = artifact.get("abi")
+    if not abi:
+        raise RuntimeError("BarangayRecords ABI is missing from the compiled artifact.")
+
+    return abi, contract_address
+
+
+def register_record_on_chain(
+    *,
+    record_id: str,
+    resident_name: str,
+    document_type: str,
+    document_hash: str,
+    ipfs_cid: str | None,
+) -> tuple[str, str]:
+    if not settings.ganache_private_key:
+        raise RuntimeError("GANACHE_PRIVATE_KEY is not configured in Backend/.env.")
+
+    abi, contract_address = get_blockchain_contract_details()
+    web3 = Web3(Web3.HTTPProvider(settings.ganache_rpc_url))
+    if not web3.is_connected():
+        raise RuntimeError(f"Unable to connect to Ganache at {settings.ganache_rpc_url}.")
+
+    account = Account.from_key(settings.ganache_private_key)
+    contract = web3.eth.contract(address=Web3.to_checksum_address(contract_address), abi=abi)
+    nonce = web3.eth.get_transaction_count(account.address)
+    chain_id = web3.eth.chain_id
+
+    transaction = contract.functions.addRecord(
+        record_id,
+        resident_name,
+        document_type,
+        document_hash,
+        ipfs_cid or "",
+    ).build_transaction(
+        {
+            "from": account.address,
+            "nonce": nonce,
+            "gas": settings.ganache_gas,
+            "gasPrice": settings.ganache_gas_price,
+            "chainId": chain_id,
+        }
+    )
+
+    signed_transaction = web3.eth.account.sign_transaction(transaction, private_key=settings.ganache_private_key)
+    raw_transaction = getattr(signed_transaction, "raw_transaction", None)
+    if raw_transaction is None:
+        raw_transaction = getattr(signed_transaction, "rawTransaction", None)
+    if raw_transaction is None:
+        raise RuntimeError("Unable to extract the signed blockchain transaction payload.")
+    tx_hash = web3.eth.send_raw_transaction(raw_transaction)
+    receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+    if receipt.status != 1:
+        raise RuntimeError("Blockchain transaction failed while storing the uploaded record.")
+
+    return web3.to_hex(tx_hash), contract_address
 
 
 def suggest_category(title: str, description: str, fallback: str) -> str:
@@ -489,6 +647,29 @@ def normalize_request_status(value: str) -> str:
         "Ready to Pickup": "Ready To Pickup",
     }
     return legacy_map.get(normalized, normalized)
+
+
+def get_weekly_request_limit(request_type: str) -> int:
+    return SPECIAL_WEEKLY_REQUEST_LIMITS.get(request_type.strip(), DEFAULT_WEEKLY_REQUEST_LIMIT)
+
+
+def enforce_weekly_request_limit(*, collection, submitted_by: str, request_type: str, now: datetime) -> None:
+    request_window_start = now - timedelta(days=7)
+    normalized_request_type = request_type.strip()
+    weekly_limit = get_weekly_request_limit(normalized_request_type)
+    request_count = collection.count_documents(
+        {
+            "submitted_by": submitted_by,
+            "request_type": normalized_request_type,
+            "created_at": {"$gte": request_window_start},
+        }
+    )
+    if request_count >= weekly_limit:
+        if weekly_limit == 1:
+            detail = f"You can only submit 1 {normalized_request_type} request every 7 days."
+        else:
+            detail = f"You can only submit {weekly_limit} {normalized_request_type} requests every 7 days."
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
 
 
 def normalize_request_id(value: str) -> str:
@@ -634,14 +815,14 @@ def captcha_error() -> HTTPException:
 def register_error() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Unable to register with the provided information.",
+        detail="Please review the registration details and try again.",
     )
 
 
 def account_exists_error() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Account already Exist",
+        detail="An account with that email already exists.",
     )
 
 
@@ -803,6 +984,9 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict:
     if not user_document:
         sessions.update_one({"_id": session_document["_id"]}, {"$set": {"revoked_at": now}})
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session is no longer active")
+    if user_document.get("archived"):
+        sessions.update_one({"_id": session_document["_id"]}, {"$set": {"revoked_at": now, "expires_at": now}})
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="This account is archived")
 
     user_document["session_expires_at"] = new_expiry
     user_document["session_id"] = session_id
@@ -840,6 +1024,9 @@ def register(payload: dict) -> AuthResponse:
         password_error = any(error.get("loc") == ("password",) for error in exc.errors())
         if password_error:
             raise register_password_error()
+        first_error = exc.errors()[0].get("msg") if exc.errors() else None
+        if first_error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(first_error))
         raise register_error()
 
     user_document = {
@@ -882,6 +1069,9 @@ def login(payload: LoginRequest, request: Request) -> AuthResponse:
         invalidate_captcha(captcha_challenge)
         attempts_used = record_failed_login(email, ip_address)
         raise login_error_with_attempts(attempts_used)
+    if user_document.get("archived"):
+        invalidate_captcha(captcha_challenge)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is archived")
 
     if user_document.get("mfa_enabled"):
         if not payload.mfa_code:
@@ -950,6 +1140,255 @@ def disable_mfa(payload: MfaCodeRequest, current_user: dict = Depends(get_curren
         },
     )
     return MessageResponse(message="MFA has been disabled")
+
+
+@app.get("/admin/summary", response_model=ActivitySummaryResponse)
+def get_admin_summary(current_user: dict = Depends(get_current_user)) -> ActivitySummaryResponse:
+    require_roles(current_user, "admin")
+    users = get_users_collection()
+    return ActivitySummaryResponse(
+        residents=users.count_documents({"role": "resident", "archived": {"$ne": True}}),
+        staff=users.count_documents({"role": {"$in": ["secretary", "admin"]}, "archived": {"$ne": True}}),
+        requests=get_record_requests_collection().count_documents({}),
+        incidents=get_community_reports_collection().count_documents({}),
+        logs=get_activity_logs_collection().count_documents({}),
+        archives=get_security_records_collection().count_documents({}),
+        archived_users=users.count_documents({"archived": True}),
+    )
+
+
+@app.get("/admin/users", response_model=list[AdminUserResponse])
+def list_admin_users(
+    role: str | None = Query(default=None, max_length=20),
+    search: str | None = Query(default=None, max_length=120),
+    archived: bool = Query(default=False),
+    current_user: dict = Depends(get_current_user),
+) -> list[AdminUserResponse]:
+    require_roles(current_user, "admin")
+    query: dict = {"archived": True} if archived else {"archived": {"$ne": True}}
+    if role and role.strip().lower() in VALID_USER_ROLES:
+        query["role"] = role.strip().lower()
+    if search and search.strip():
+        expression = {"$regex": search.strip(), "$options": "i"}
+        query["$or"] = [
+            {"email": expression},
+            {"first_name": expression},
+            {"middle_name": expression},
+            {"last_name": expression},
+            {"purok": expression},
+            {"role": expression},
+        ]
+    documents = list(get_users_collection().find(query).sort("created_at", -1).limit(200))
+    return [serialize_admin_user(document) for document in documents]
+
+
+@app.post("/admin/users", response_model=AdminUserResponse, status_code=status.HTTP_201_CREATED)
+def create_admin_user(payload: AdminUserCreateRequest, current_user: dict = Depends(get_current_user)) -> AdminUserResponse:
+    require_roles(current_user, "admin")
+    users = get_users_collection()
+    email = normalize_email(payload.email)
+    if users.find_one({"email": email}):
+        raise account_exists_error()
+    now = datetime.now(UTC)
+    document = {
+        "first_name": payload.first_name,
+        "middle_name": payload.middle_name,
+        "last_name": payload.last_name,
+        "email": email,
+        "password_hash": hash_password(payload.password),
+        "purok": payload.purok,
+        "role": payload.role,
+        "mfa_enabled": False,
+        "mfa_secret": None,
+        "mfa_pending_secret": None,
+        "archived": False,
+        "archived_at": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    users.insert_one(document)
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Created User Account",
+        target_collection="users",
+        target_id=email,
+        details=f"Created {payload.role} account for {payload.first_name} {payload.last_name}.",
+    )
+    return serialize_admin_user(document)
+
+
+@app.patch("/admin/users/{email:path}", response_model=AdminUserResponse)
+def update_admin_user(
+    email: str,
+    payload: AdminUserUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+) -> AdminUserResponse:
+    require_roles(current_user, "admin")
+    users = get_users_collection()
+    normalized_email = normalize_email(email)
+    document = users.find_one({"email": normalized_email})
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if normalized_email == "admin@recordwise.com" and payload.archived:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Default admin account cannot be archived")
+    now = datetime.now(UTC)
+    updates: dict = {
+        "first_name": payload.first_name,
+        "middle_name": payload.middle_name,
+        "last_name": payload.last_name,
+        "purok": payload.purok,
+        "role": payload.role,
+        "archived": payload.archived,
+        "updated_at": now,
+        "archived_at": now if payload.archived else None,
+    }
+    if payload.password:
+        updates["password_hash"] = hash_password(payload.password)
+    users.update_one({"_id": document["_id"]}, {"$set": updates})
+    updated = users.find_one({"_id": document["_id"]})
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Updated User Account",
+        target_collection="users",
+        target_id=normalized_email,
+        details=f"Updated {payload.role} account details. Archived={payload.archived}.",
+    )
+    return serialize_admin_user(updated)
+
+
+@app.delete("/admin/users/{email:path}", response_model=MessageResponse)
+def archive_admin_user(email: str, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    require_roles(current_user, "admin")
+    normalized_email = normalize_email(email)
+    if normalized_email == "admin@recordwise.com":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Default admin account cannot be archived")
+    result = get_users_collection().update_one(
+        {"email": normalized_email},
+        {"$set": {"archived": True, "archived_at": datetime.now(UTC), "updated_at": datetime.now(UTC)}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Archived User Account",
+        target_collection="users",
+        target_id=normalized_email,
+        details="User account moved to archives.",
+    )
+    return MessageResponse(message="User archived successfully")
+
+
+@app.delete("/admin/users/{email:path}/permanent", response_model=MessageResponse)
+def delete_admin_user(email: str, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    require_roles(current_user, "admin")
+    normalized_email = normalize_email(email)
+    if normalized_email == "admin@recordwise.com":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Default admin account cannot be deleted")
+    if normalized_email == normalize_email(current_user["email"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your current account")
+    result = get_users_collection().delete_one({"email": normalized_email})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Deleted User Account",
+        target_collection="users",
+        target_id=normalized_email,
+        details="User account permanently deleted from the admin workspace.",
+    )
+    return MessageResponse(message="User deleted successfully")
+
+
+@app.post("/admin/users/{email:path}/restore", response_model=AdminUserResponse)
+def restore_admin_user(email: str, current_user: dict = Depends(get_current_user)) -> AdminUserResponse:
+    require_roles(current_user, "admin")
+    normalized_email = normalize_email(email)
+    users = get_users_collection()
+    document = users.find_one({"email": normalized_email})
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    users.update_one(
+        {"_id": document["_id"]},
+        {"$set": {"archived": False, "archived_at": None, "updated_at": datetime.now(UTC)}},
+    )
+    updated = users.find_one({"_id": document["_id"]})
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Restored User Account",
+        target_collection="users",
+        target_id=normalized_email,
+        details="User account restored from archives.",
+    )
+    return serialize_admin_user(updated)
+
+
+@app.delete("/admin/record-requests/{request_id}", response_model=MessageResponse)
+def delete_record_request(request_id: str, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    require_roles(current_user, "admin")
+    result = get_record_requests_collection().delete_one({"request_id": normalize_request_id(request_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Deleted Record Request",
+        target_collection="record_requests",
+        target_id=normalize_request_id(request_id),
+        details="Request deleted from admin workspace.",
+    )
+    return MessageResponse(message="Request deleted successfully")
+
+
+@app.delete("/admin/community-reports/{report_id}", response_model=MessageResponse)
+def delete_community_report(report_id: str, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    require_roles(current_user, "admin")
+    result = get_community_reports_collection().delete_one({"report_id": report_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Deleted Community Report",
+        target_collection="community_reports",
+        target_id=report_id,
+        details="Incident report deleted from admin workspace.",
+    )
+    return MessageResponse(message="Incident deleted successfully")
+
+
+@app.delete("/admin/security-records/{record_id}", response_model=MessageResponse)
+def delete_security_record(record_id: str, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    require_roles(current_user, "admin")
+    result = get_security_records_collection().delete_one({"record_id": record_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archive record not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Deleted Archive Record",
+        target_collection="security_records",
+        target_id=record_id,
+        details="Archive record removed from the system.",
+    )
+    return MessageResponse(message="Archive deleted successfully")
+
+
+@app.delete("/admin/activity-logs/{log_id}", response_model=MessageResponse)
+def delete_activity_log(log_id: str, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    require_roles(current_user, "admin")
+    result = get_activity_logs_collection().delete_one({"log_id": log_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Log not found")
+    return MessageResponse(message="Log deleted successfully")
 
 
 @app.get("/security-records", response_model=RecordListResponse)
@@ -1082,9 +1521,30 @@ async def create_security_record(
         "updated_at": now,
         "previous_hash": previous_record.get("record_hash") if previous_record else None,
         "record_hash": record_hash,
+        "blockchain_tx_hash": None,
+        "blockchain_contract_address": None,
+        "blockchain_network_id": None,
         "insights": insights,
         "audit_trail": [audit_entry],
     }
+    try:
+        blockchain_tx_hash, contract_address = register_record_on_chain(
+            record_id=record_id,
+            resident_name=clean_resident_name,
+            document_type=clean_category,
+            document_hash=record_hash,
+            ipfs_cid=evidence_path,
+        )
+    except RuntimeError as error:
+        if evidence_path:
+            stored_file = MEDIA_DIR / evidence_path
+            if stored_file.exists():
+                stored_file.unlink()
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+
+    record_document["blockchain_tx_hash"] = blockchain_tx_hash
+    record_document["blockchain_contract_address"] = contract_address
+    record_document["blockchain_network_id"] = settings.ganache_network_id
     records.insert_one(record_document)
     log_activity(
         actor_email=current_user["email"],
@@ -1240,11 +1700,24 @@ async def create_record_request(
     require_roles(current_user, "resident")
     collection = get_record_requests_collection()
     now = datetime.now(UTC)
+    clean_request_type = request_type.strip()
+    clean_purpose = purpose.strip()
+
+    if not clean_request_type or not clean_purpose:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="All required fields must be provided")
+
+    enforce_weekly_request_limit(
+        collection=collection,
+        submitted_by=current_user["email"],
+        request_type=clean_request_type,
+        now=now,
+    )
+
     evidence_filename, evidence_path = await save_upload_file(evidence, "record_requests")
     document = {
         "request_id": generate_request_id(),
-        "request_type": request_type.strip(),
-        "purpose": purpose.strip(),
+        "request_type": clean_request_type,
+        "purpose": clean_purpose,
         "status": "Pending",
         "resident_name": " ".join(
             part for part in [current_user.get("first_name"), current_user.get("middle_name"), current_user.get("last_name")] if part
@@ -1264,8 +1737,6 @@ async def create_record_request(
             )
         ],
     }
-    if not document["request_type"] or not document["purpose"]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="All required fields must be provided")
     collection.insert_one(document)
     log_activity(
         actor_email=current_user["email"],
@@ -1539,3 +2010,43 @@ def list_notifications(current_user: dict = Depends(get_current_user)) -> list[N
 
     notifications.sort(key=lambda item: item.created_at, reverse=True)
     return notifications[:10]
+
+
+@app.get("/assistant/status", response_model=AssistantStatusResponse)
+def get_assistant_model_status(current_user: dict = Depends(get_current_user)) -> AssistantStatusResponse:
+    return AssistantStatusResponse(**get_assistant_status())
+
+
+@app.post("/assistant/train", response_model=AssistantTrainResponse)
+def retrain_assistant_model(current_user: dict = Depends(get_current_user)) -> AssistantTrainResponse:
+    require_roles(current_user, "admin")
+    train_assistant_model()
+    status_payload = get_assistant_status()
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role=get_user_role(current_user),
+        action="Retrained AI Assistant",
+        target_collection="assistant_model",
+        target_id="chainwise-local-assistant",
+        details="Rebuilt the local assistant model from the custom dataset.",
+    )
+    return AssistantTrainResponse(
+        message="Assistant model retrained successfully.",
+        status=AssistantStatusResponse(**status_payload),
+    )
+
+
+@app.post("/assistant/chat", response_model=AssistantChatResponse)
+def chat_with_assistant(
+    payload: AssistantChatRequest,
+    current_user: dict = Depends(get_current_user),
+) -> AssistantChatResponse:
+    inference = generate_assistant_reply(payload.message, get_user_role(current_user))
+    return AssistantChatResponse(
+        reply=inference.reply,
+        matched_intent=inference.matched_intent,
+        confidence=inference.confidence,
+        route=inference.route,
+        route_label=inference.route_label,
+        suggestions=inference.suggestions,
+    )

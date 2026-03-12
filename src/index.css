@@ -30,7 +30,54 @@
     font: inherit;
   }
 
+  button:not(:disabled) {
+    @apply transition duration-200 ease-out;
+  }
+
+  button:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+
+  button:not(:disabled):active {
+    transform: translateY(0) scale(0.98);
+  }
+
   #root {
     @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .interactive-button {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out, background-color 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out, opacity 200ms ease-out;
+  }
+
+  .interactive-button:hover:not(:disabled) {
+    transform: translateY(-0.125rem);
+  }
+
+  .interactive-button:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .interactive-button:disabled {
+    transform: none;
+  }
+
+  .interactive-button-strong {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out, background-color 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out, opacity 200ms ease-out;
+  }
+
+  .interactive-button-strong:hover:not(:disabled) {
+    transform: translateY(-0.125rem);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
+  }
+
+  .interactive-button-strong:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .interactive-button-strong:disabled {
+    transform: none;
   }
 }

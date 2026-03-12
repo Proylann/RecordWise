@@ -133,7 +133,7 @@ function ReportProblemPage() {
                 <p className="text-sm text-[#475569]">{file ? file.name : 'Upload required photo evidence'}</p>
                 <div className="flex gap-2">
                   <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" onChange={(event: ChangeEvent<HTMLInputElement>) => setFile(event.target.files?.[0] ?? null)} className="hidden" />
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-[#c9d6ec] bg-white px-4 py-2 text-sm font-semibold text-[#2f6df6]">Choose File</button>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="interactive-button rounded-xl border border-[#c9d6ec] bg-white px-4 py-2 text-sm font-semibold text-[#2f6df6] hover:border-[#2f6df6] hover:bg-[#f5f9ff]">Choose File</button>
                 </div>
               </div>
               <p className="mt-2 text-xs text-[#94a3b8]">Maximum file size: 10 MB</p>
@@ -149,7 +149,7 @@ function ReportProblemPage() {
                 {status.message}
               </div>
             ) : null}
-            <button type="submit" className="rounded-2xl bg-[#111827] px-5 py-3 text-sm font-semibold text-white">Submit Report</button>
+            <button type="submit" className="interactive-button-strong rounded-2xl bg-[#111827] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1f2937]">Submit Report</button>
           </form>
         </section>
 

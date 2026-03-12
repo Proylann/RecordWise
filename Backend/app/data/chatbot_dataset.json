@@ -1,0 +1,469 @@
+{
+  "name": "ChainWise Local Assistant Dataset",
+  "intents": [
+    {
+      "tag": "greeting_help",
+      "allowed_roles": ["resident", "secretary", "admin"],
+      "keywords": ["help", "hello", "hi", "assist", "guide"],
+      "examples": [
+        "help",
+        "hello",
+        "hi can you help me",
+        "i need assistance",
+        "can you guide me",
+        "what can you do"
+      ],
+      "responses": [
+        "I can guide you through the ChainWise system. Tell me the task you want to do.",
+        "Tell me what you want to do in ChainWise and I will point you to the correct page.",
+        "I am the ChainWise assistant. Ask me about requests, reports, archives, logs, accounts, or your profile."
+      ],
+      "follow_up": "Example: say 'how do I request a record' or 'where do I check my status'.",
+      "route_key_by_role": {
+        "resident": "assistant",
+        "secretary": "assistant",
+        "admin": "assistant"
+      },
+      "route_label_by_role": {
+        "resident": "AI Assistant",
+        "secretary": "AI Assistant",
+        "admin": "AI Assistant"
+      },
+      "suggestions": [
+        "How do I request a record?",
+        "Where can I report a problem?",
+        "How do I check my request status?"
+      ]
+    },
+    {
+      "tag": "dashboard_navigation",
+      "allowed_roles": ["resident", "secretary", "admin"],
+      "keywords": ["dashboard", "home", "main page", "overview", "start"],
+      "examples": [
+        "take me to dashboard",
+        "where is the dashboard",
+        "go to home",
+        "where do i start",
+        "show main page"
+      ],
+      "responses": [
+        "Your dashboard is the best starting point. It shows the tools available for your account and current activity.",
+        "Open the dashboard first if you want an overview of your workspace and shortcuts to your tasks."
+      ],
+      "steps": [
+        "Use the sidebar and select Dashboard.",
+        "Review the summary cards and recent activity.",
+        "Choose the next page based on the task you need."
+      ],
+      "route_key_by_role": {
+        "resident": "dashboard",
+        "secretary": "dashboard",
+        "admin": "dashboard"
+      },
+      "route_label_by_role": {
+        "resident": "Dashboard",
+        "secretary": "Dashboard",
+        "admin": "Dashboard"
+      },
+      "suggestions": [
+        "How do I request a barangay clearance?",
+        "Where do I report a problem?",
+        "How do I open my profile?"
+      ]
+    },
+    {
+      "tag": "resident_request_record",
+      "allowed_roles": ["resident"],
+      "keywords": ["request", "record", "barangay clearance", "certificate", "indigency", "residency", "document"],
+      "examples": [
+        "how do i request a barangay clearance",
+        "i want to request a certificate",
+        "where do i request a document",
+        "request record",
+        "i need a certificate of residency",
+        "how can i ask for a barangay record"
+      ],
+      "responses": [
+        "Use the Request Record page to submit a document request.",
+        "You can create a new document request from the Request Record page."
+      ],
+      "steps": [
+        "Open the request form.",
+        "Select the document type you need.",
+        "Enter the purpose of the request.",
+        "Attach supporting proof if needed, then submit."
+      ],
+      "follow_up": "After submitting, you can monitor the request in Records Queue.",
+      "route_key_by_role": {
+        "resident": "request_record"
+      },
+      "route_label_by_role": {
+        "resident": "Request Record"
+      },
+      "suggestions": [
+        "How do I check my request status?",
+        "What is the weekly request limit?",
+        "How do I report a problem?"
+      ]
+    },
+    {
+      "tag": "resident_track_requests",
+      "allowed_roles": ["resident"],
+      "keywords": ["status", "queue", "track", "records queue", "pending", "pickup"],
+      "examples": [
+        "where do i check my request status",
+        "how do i track my request",
+        "records queue",
+        "show my pending requests",
+        "where can i see if my document is ready",
+        "check request progress"
+      ],
+      "responses": [
+        "Open Records Queue to monitor the current status of your submitted requests.",
+        "Use Records Queue to see pending, in-progress, and pickup-ready requests."
+      ],
+      "steps": [
+        "Open the queue page from the sidebar.",
+        "Review the status badge for each request.",
+        "Look for 'Ready To Pickup' when your document is complete."
+      ],
+      "route_key_by_role": {
+        "resident": "records_queue"
+      },
+      "route_label_by_role": {
+        "resident": "Records Queue"
+      },
+      "suggestions": [
+        "How do I request a record?",
+        "How do I report a problem?",
+        "Where is my profile?"
+      ]
+    },
+    {
+      "tag": "resident_report_problem",
+      "allowed_roles": ["resident"],
+      "keywords": ["report", "problem", "incident", "complaint", "community", "issue"],
+      "examples": [
+        "how do i report a problem",
+        "i need to report an incident",
+        "where can i submit a complaint",
+        "community report",
+        "report issue in my area",
+        "how to send a problem report"
+      ],
+      "responses": [
+        "Use Report Problem to send an incident or community concern to the barangay staff.",
+        "The Report Problem page is where you submit community concerns and upload photo evidence."
+      ],
+      "steps": [
+        "Choose the report type.",
+        "If you select Other, type the custom concern.",
+        "Add a clear description and urgency level.",
+        "Upload photo evidence and submit the report."
+      ],
+      "route_key_by_role": {
+        "resident": "report_problem"
+      },
+      "route_label_by_role": {
+        "resident": "Report Problem"
+      },
+      "suggestions": [
+        "Where do I track my requests?",
+        "How do I open my profile?",
+        "How do I request a record?"
+      ]
+    },
+    {
+      "tag": "profile_help",
+      "allowed_roles": ["resident", "secretary", "admin"],
+      "keywords": ["profile", "account", "my info", "user settings", "details"],
+      "examples": [
+        "open my profile",
+        "where is my account page",
+        "how do i view my information",
+        "profile",
+        "show user details"
+      ],
+      "responses": [
+        "Your Profile page contains your account details and current user information.",
+        "Open Profile to review your user details and session-related information."
+      ],
+      "steps": [
+        "Select Profile from the sidebar.",
+        "Review your stored account information.",
+        "Sign out there when you need to end your session."
+      ],
+      "route_key_by_role": {
+        "resident": "profile",
+        "secretary": "profile",
+        "admin": "profile"
+      },
+      "route_label_by_role": {
+        "resident": "Profile",
+        "secretary": "Profile",
+        "admin": "Profile"
+      },
+      "suggestions": [
+        "Where is the dashboard?",
+        "How do I request a record?",
+        "How do I report a problem?"
+      ]
+    },
+    {
+      "tag": "login_help",
+      "allowed_roles": ["resident", "secretary", "admin"],
+      "keywords": ["login", "signin", "sign in", "access", "enter account"],
+      "examples": [
+        "how do i log in",
+        "i cannot find the login page",
+        "sign in help",
+        "how to access my account",
+        "login instructions"
+      ],
+      "responses": [
+        "Use the Login page to access ChainWise with your registered email, password, captcha answer, and MFA code if enabled.",
+        "The Login page is the entry point for your ChainWise account."
+      ],
+      "steps": [
+        "Open the login page.",
+        "Enter your email and password.",
+        "Solve the captcha challenge.",
+        "If MFA is enabled, enter the current code and continue."
+      ],
+      "follow_up": "If the session expires, sign in again and continue from the dashboard.",
+      "suggestions": [
+        "How do I register?",
+        "Where is the dashboard?",
+        "How do I open my profile?"
+      ]
+    },
+    {
+      "tag": "register_help",
+      "allowed_roles": ["resident", "secretary", "admin"],
+      "keywords": ["register", "signup", "create account", "sign up", "new account"],
+      "examples": [
+        "how do i register",
+        "create an account",
+        "sign up",
+        "new resident account",
+        "how to make an account"
+      ],
+      "responses": [
+        "Use the Register page to create a resident account with your name, email, purok, and password.",
+        "The Register page is for new resident users who need to create an account."
+      ],
+      "steps": [
+        "Open the registration page.",
+        "Enter your first, middle, and last name.",
+        "Select your purok and create a valid password.",
+        "Submit the form to create the account."
+      ],
+      "suggestions": [
+        "How do I log in?",
+        "Where is the dashboard?",
+        "How do I request a record?"
+      ]
+    },
+    {
+      "tag": "secretary_process_requests",
+      "allowed_roles": ["secretary", "admin"],
+      "keywords": ["process", "request", "handle request", "assign", "approve", "secretary request"],
+      "examples": [
+        "how do i process requests",
+        "where do i handle pending requests",
+        "secretary requests page",
+        "how do i assign a request",
+        "manage document requests"
+      ],
+      "responses": [
+        "Use the Requests page to claim, update, and complete resident document requests.",
+        "Pending and in-progress document handling is done from the Requests page."
+      ],
+      "steps": [
+        "Open the requests workspace.",
+        "Review pending or in-progress items.",
+        "Assign the request to a secretary if needed.",
+        "Update the status as work progresses."
+      ],
+      "route_key_by_role": {
+        "secretary": "requests",
+        "admin": "requests"
+      },
+      "route_label_by_role": {
+        "secretary": "Requests",
+        "admin": "Admin Requests"
+      },
+      "suggestions": [
+        "Where do I review incident reports?",
+        "How do I upload archives?",
+        "Where can I see activity logs?"
+      ]
+    },
+    {
+      "tag": "secretary_reports",
+      "allowed_roles": ["secretary", "admin"],
+      "keywords": ["incident", "reports", "community report", "review reports", "problems"],
+      "examples": [
+        "where do i review incident reports",
+        "how do i open community reports",
+        "secretary reports",
+        "manage reported problems",
+        "review resident problem reports"
+      ],
+      "responses": [
+        "Use the incident reports workspace to review and update community reports.",
+        "Reported problems from residents are handled from the reports page."
+      ],
+      "steps": [
+        "Open the reports page.",
+        "Review the report type, urgency, and evidence.",
+        "Update the status as the case is reviewed or resolved."
+      ],
+      "route_key_by_role": {
+        "secretary": "reports",
+        "admin": "incidents"
+      },
+      "route_label_by_role": {
+        "secretary": "Incident Reports",
+        "admin": "Admin Incidents"
+      },
+      "suggestions": [
+        "How do I process requests?",
+        "How do I upload archive records?",
+        "Where can I see logs?"
+      ]
+    },
+    {
+      "tag": "archives_help",
+      "allowed_roles": ["secretary", "admin"],
+      "keywords": ["archive", "upload archive", "archived records", "records storage", "historical record"],
+      "examples": [
+        "how do i upload archive records",
+        "where are archived records",
+        "archive records",
+        "how do i store a record",
+        "open archives"
+      ],
+      "responses": [
+        "Use the archive workspace to upload records and review archived files.",
+        "Archived record management is handled in the archive pages."
+      ],
+      "steps": [
+        "Open the archive upload page if you need to store a new file.",
+        "Use the archive views to review certificate, incident, and barangay records.",
+        "Use the verification tools when checking archived record integrity."
+      ],
+      "route_key_by_role": {
+        "secretary": "archives",
+        "admin": "archives"
+      },
+      "route_label_by_role": {
+        "secretary": "Upload Archive",
+        "admin": "Admin Archives"
+      },
+      "suggestions": [
+        "How do I process requests?",
+        "Where do I review reports?",
+        "Where can I see activity logs?"
+      ]
+    },
+    {
+      "tag": "activity_logs_help",
+      "allowed_roles": ["secretary", "admin"],
+      "keywords": ["logs", "activity", "history", "audit", "system actions"],
+      "examples": [
+        "where can i see activity logs",
+        "open logs",
+        "how do i check audit history",
+        "activity logs",
+        "show system actions"
+      ],
+      "responses": [
+        "Use the logs page to review recent system actions and work history.",
+        "Activity and audit review is available from the logs workspace."
+      ],
+      "steps": [
+        "Open the logs page from the sidebar.",
+        "Filter by actor, collection, search term, or date.",
+        "Review the latest entries for system actions."
+      ],
+      "route_key_by_role": {
+        "secretary": "activity_logs",
+        "admin": "logs"
+      },
+      "route_label_by_role": {
+        "secretary": "Activity Logs",
+        "admin": "Admin Logs"
+      },
+      "suggestions": [
+        "How do I process requests?",
+        "Where are archives?",
+        "Where do I review incident reports?"
+      ]
+    },
+    {
+      "tag": "admin_residents",
+      "allowed_roles": ["admin"],
+      "keywords": ["resident management", "residents", "user accounts", "manage residents"],
+      "examples": [
+        "how do i manage residents",
+        "where is resident management",
+        "open resident accounts",
+        "admin residents",
+        "manage resident users"
+      ],
+      "responses": [
+        "Use Resident Management to review, update, and organize resident accounts.",
+        "Resident account administration is done in the residents workspace."
+      ],
+      "steps": [
+        "Open the residents page.",
+        "Search or filter the user you need.",
+        "Review account details and perform the required admin action."
+      ],
+      "route_key_by_role": {
+        "admin": "residents"
+      },
+      "route_label_by_role": {
+        "admin": "Resident Management"
+      },
+      "suggestions": [
+        "How do I manage staff?",
+        "Where do I review requests?",
+        "Where can I see logs?"
+      ]
+    },
+    {
+      "tag": "admin_staff",
+      "allowed_roles": ["admin"],
+      "keywords": ["staff", "secretary accounts", "manage staff", "admin staff"],
+      "examples": [
+        "how do i manage staff",
+        "where are staff accounts",
+        "open secretary accounts",
+        "admin staff",
+        "manage system staff"
+      ],
+      "responses": [
+        "Use Staff Accounts to manage secretary and staff access.",
+        "Staff account administration is available from the staff workspace."
+      ],
+      "steps": [
+        "Open the staff page.",
+        "Review current staff users.",
+        "Create, update, archive, or restore accounts as needed."
+      ],
+      "route_key_by_role": {
+        "admin": "staff"
+      },
+      "route_label_by_role": {
+        "admin": "Staff Accounts"
+      },
+      "suggestions": [
+        "How do I manage residents?",
+        "Where are admin requests?",
+        "How do I open archives?"
+      ]
+    }
+  ]
+}

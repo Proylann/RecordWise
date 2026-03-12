@@ -27,6 +27,12 @@ class Settings:
         self.login_rate_limit_window_minutes = int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_MINUTES", "15"))
         self.captcha_ttl_minutes = int(os.getenv("CAPTCHA_TTL_MINUTES", "5"))
         self.max_upload_size_bytes = int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(10 * 1024 * 1024)))
+        self.ganache_rpc_url = os.getenv("GANACHE_RPC_URL", "http://127.0.0.1:7546").strip() or "http://127.0.0.1:7546"
+        self.ganache_network_id = int(os.getenv("GANACHE_NETWORK_ID", "5777"))
+        self.ganache_private_key = os.getenv("GANACHE_PRIVATE_KEY", "").strip()
+        self.ganache_gas = int(os.getenv("GANACHE_GAS", "6721975"))
+        self.ganache_gas_price = int(os.getenv("GANACHE_GAS_PRICE", "2000000000"))
+        self.blockchain_contract_address = os.getenv("BLOCKCHAIN_CONTRACT_ADDRESS", "").strip()
         self.cors_origins = [
             origin.strip()
             for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")

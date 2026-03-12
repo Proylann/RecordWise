@@ -138,7 +138,7 @@ function SecretaryReportsPage() {
                     href={`${API_BASE_URL}${report.evidence_url}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-4 inline-flex rounded-xl border border-[#c9d6ec] bg-white px-4 py-2.5 text-sm font-semibold text-[#2f6df6] transition hover:border-[#2f6df6] hover:bg-[#f5f9ff]"
+                    className="mt-4 inline-flex rounded-xl border border-[#c9d6ec] bg-white px-4 py-2.5 text-sm font-semibold text-[#2f6df6] transition hover:-translate-y-0.5 hover:border-[#2f6df6] hover:bg-[#f5f9ff] active:translate-y-0 active:scale-[0.98]"
                   >
                     View Uploaded Images
                   </a>
@@ -150,7 +150,7 @@ function SecretaryReportsPage() {
                       type="button"
                       disabled={status === report.status}
                       onClick={() => void updateReport(report.report_id, status)}
-                      className="rounded-xl border border-[#d8deea] bg-white px-3 py-2 text-xs font-semibold text-[#334155] transition hover:border-[#2f6df6] hover:text-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="interactive-button rounded-xl border border-[#d8deea] bg-white px-3 py-2 text-xs font-semibold text-[#334155] transition hover:border-[#2f6df6] hover:text-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {status}
                     </button>

@@ -95,6 +95,9 @@ function RequestRecordPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2f6df6]">Resident Services</p>
           <h1 className="mt-2 text-3xl font-semibold text-[#111827]">Request for Record</h1>
           <p className="mt-2 text-sm text-[#64748b]">Submit your barangay document request and attach supporting proof if needed.</p>
+          <p className="mt-2 text-sm text-amber-700">
+            Weekly limit: most document types allow 2 requests every 7 days. Business Clearance allows 1 request every 7 days.
+          </p>
 
           <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
             <select value={requestType} onChange={(event) => setRequestType(event.target.value)} required className="w-full rounded-2xl border border-[#d8deea] bg-[#fcfdff] px-4 py-3.5 text-sm text-[#111827] outline-none">
@@ -109,7 +112,7 @@ function RequestRecordPage() {
                 <p className="text-sm text-[#475569]">{file ? file.name : 'Optional supporting attachment'}</p>
                 <div className="flex gap-2">
                   <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(event: ChangeEvent<HTMLInputElement>) => setFile(event.target.files?.[0] ?? null)} className="hidden" />
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-[#c9d6ec] bg-white px-4 py-2 text-sm font-semibold text-[#2f6df6]">Choose File</button>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="interactive-button rounded-xl border border-[#c9d6ec] bg-white px-4 py-2 text-sm font-semibold text-[#2f6df6] hover:border-[#2f6df6] hover:bg-[#f5f9ff]">Choose File</button>
                 </div>
               </div>
               <p className="mt-2 text-xs text-[#94a3b8]">Maximum file size: 10 MB</p>
@@ -125,7 +128,7 @@ function RequestRecordPage() {
                 {status.message}
               </div>
             ) : null}
-            <button type="submit" className="rounded-2xl bg-[#2f6df6] px-5 py-3 text-sm font-semibold text-white">Submit Request</button>
+            <button type="submit" className="interactive-button-strong rounded-2xl bg-[#2f6df6] px-5 py-3 text-sm font-semibold text-white hover:bg-[#245de0]">Submit Request</button>
           </form>
         </section>
 

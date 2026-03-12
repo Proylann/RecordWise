@@ -1,0 +1,16 @@
+{
+  "name": "recordwise-blockchain",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Truffle workspace for deploying the BarangayRecords contract to Ganache.",
+  "scripts": {
+    "compile": "truffle compile",
+    "migrate:ganache": "truffle migrate --network ganache",
+    "migrate:ganache:reset": "truffle migrate --reset --network ganache"
+  },
+  "devDependencies": {
+    "@truffle/hdwallet-provider": "^2.1.15",
+    "dotenv": "^16.6.1",
+    "truffle": "^5.11.5"
+  }
+}

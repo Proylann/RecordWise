@@ -17,6 +17,9 @@ type ArchiveRecord = {
   source_id?: string | null
   evidence_url?: string | null
   record_hash: string
+  blockchain_tx_hash?: string | null
+  blockchain_contract_address?: string | null
+  blockchain_network_id?: number | null
 }
 
 type VerificationResponse = {
@@ -282,6 +285,7 @@ function ArchivedRecordsPage({ archiveType, currentRoute, title, description, em
                     <p className="mt-3 text-sm leading-6 text-[#334155]">{record.description}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[#64748b]">
                       <span>Hash: {record.record_hash}</span>
+                      {record.blockchain_tx_hash ? <span>On-chain tx: {record.blockchain_tx_hash}</span> : null}
                       {record.evidence_url ? (
                         <a href={`${API_BASE_URL}${record.evidence_url}`} target="_blank" rel="noreferrer" className="font-semibold text-[#2f6df6]">
                           View archived evidence

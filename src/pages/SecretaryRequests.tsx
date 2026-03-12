@@ -113,7 +113,7 @@ function SecretaryRequestsPage() {
                 key={filter}
                 type="button"
                 onClick={() => setActiveFilter(filter)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                className={`interactive-button rounded-full px-4 py-2 text-sm font-semibold transition ${
                   activeFilter === filter
                     ? 'bg-[#2f6df6] text-white'
                     : 'border border-[#d8deea] bg-white text-[#475569] hover:border-[#2f6df6] hover:text-[#1d4ed8]'
@@ -164,14 +164,14 @@ function SecretaryRequestsPage() {
                         <button
                           type="button"
                           onClick={() => void assignToMe(request.request_id)}
-                          className="inline-flex rounded-xl border border-[#d8deea] bg-white px-4 py-2 text-xs font-semibold text-[#111827]"
+                          className="interactive-button inline-flex rounded-xl border border-[#d8deea] bg-white px-4 py-2 text-xs font-semibold text-[#111827] hover:border-[#2f6df6] hover:bg-[#f5f9ff]"
                         >
                           Assign to me
                         </button>
                       ) : null}
                       <Link
                         to={`${appRoutes.processRequest}?request_id=${encodeURIComponent(request.request_id)}`}
-                        className="inline-flex rounded-xl bg-[#111827] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#1f2937]"
+                        className="inline-flex rounded-xl bg-[#111827] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#1f2937] active:translate-y-0 active:scale-[0.98]"
                       >
                         Process
                       </Link>

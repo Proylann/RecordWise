@@ -285,7 +285,7 @@ function ProcessRequestPage() {
                     type="button"
                     onClick={() => void printCertificate()}
                     disabled={request.status === 'Declined' || request.status === 'Claimed'}
-                    className="rounded-2xl bg-[#2f6df6] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#245de0] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="interactive-button-strong rounded-2xl bg-[#2f6df6] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#245de0] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Print Certificate
                   </button>
@@ -308,7 +308,7 @@ function ProcessRequestPage() {
                     type="button"
                     onClick={() => void updateStatus(selectedStatus)}
                     disabled={(request.status === 'In Progress' && !pdfGenerated && selectedStatus === 'Ready To Pickup') || selectedStatus === request.status}
-                    className="rounded-2xl border border-[#d8deea] bg-white px-5 py-3 text-sm font-semibold text-[#1d4ed8] transition hover:border-[#2f6df6] hover:bg-[#f5f9ff] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="interactive-button rounded-2xl border border-[#d8deea] bg-white px-5 py-3 text-sm font-semibold text-[#1d4ed8] transition hover:border-[#2f6df6] hover:bg-[#f5f9ff] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Update Status
                   </button>

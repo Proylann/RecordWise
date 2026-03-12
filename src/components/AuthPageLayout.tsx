@@ -10,6 +10,10 @@ type AuthPageLayoutProps = {
   mode: AuthMode
 }
 
+function isValidPersonName(value: string) {
+  return /^[A-Za-z][A-Za-z\s'.-]*$/.test(value.trim())
+}
+
 function UserIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-7 w-7">
@@ -134,6 +138,18 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
           throw new Error('Passwords do not match')
         }
 
+        if (!isValidPersonName(formData.firstName)) {
+          throw new Error('First name may only contain letters, spaces, apostrophes, periods, and hyphens')
+        }
+
+        if (!isValidPersonName(formData.middleName)) {
+          throw new Error('Middle name may only contain letters, spaces, apostrophes, periods, and hyphens')
+        }
+
+        if (!isValidPersonName(formData.lastName)) {
+          throw new Error('Last name may only contain letters, spaces, apostrophes, periods, and hyphens')
+        }
+
         await register(
           formData.firstName.trim(),
           formData.middleName.trim(),
@@ -184,6 +200,7 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
             onChange={(event) => updateField(field, event.target.value)}
             placeholder={placeholder}
             required={required}
+            inputMode={field === 'email' ? 'email' : 'text'}
             className="w-full rounded-2xl border border-white/12 bg-black px-5 py-4 text-base text-white outline-none transition focus:border-white/40 focus:ring-2 focus:ring-white/10 placeholder:text-base placeholder:text-zinc-400 sm:text-lg sm:placeholder:text-lg"
           />
           {canToggle && (

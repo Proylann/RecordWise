@@ -24,5 +24,6 @@ dist-ssr
 *.sw?
 Backend/.venv/
 Backend/.env
+blockchain/.env
 __pycache__/
 *.py[cod]

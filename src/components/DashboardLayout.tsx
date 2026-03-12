@@ -4,6 +4,14 @@ import { useAuth } from '../context/AuthContext'
 
 export type DashboardRoute =
   | 'dashboard'
+  | 'assistant'
+  | 'admin-residents'
+  | 'admin-staff'
+  | 'admin-requests'
+  | 'admin-incidents'
+  | 'admin-logs'
+  | 'admin-activities'
+  | 'admin-archives'
   | 'request-record'
   | 'records-queue'
   | 'report-problem'
@@ -67,6 +75,23 @@ function QueueIcon({ className = 'h-5 w-5' }: IconProps) {
   )
 }
 
+function AssistantIcon({ className = 'h-5 w-5' }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className={className} aria-hidden="true">
+      <path d="M12 3v3" />
+      <path d="M6.3 6.3 8.4 8.4" />
+      <path d="M3 12h3" />
+      <path d="M18 12h3" />
+      <path d="m15.6 8.4 2.1-2.1" />
+      <rect x="6" y="9" width="12" height="9" rx="3" />
+      <path d="M9 21h6" />
+      <path d="M10 13h.01" />
+      <path d="M14 13h.01" />
+      <path d="M9 16c.8.7 1.8 1 3 1s2.2-.3 3-1" />
+    </svg>
+  )
+}
+
 function ReportIcon({ className = 'h-5 w-5' }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className={className} aria-hidden="true">
@@ -122,6 +147,14 @@ function ProfileIcon({ className = 'h-5 w-5' }: IconProps) {
 
 const routeIcons: Partial<Record<DashboardRoute, ComponentType<IconProps>>> = {
   dashboard: DashboardIcon,
+  assistant: AssistantIcon,
+  'admin-residents': ProfileIcon,
+  'admin-staff': ProfileIcon,
+  'admin-requests': RequestIcon,
+  'admin-incidents': ReportIcon,
+  'admin-logs': LogsIcon,
+  'admin-activities': DashboardIcon,
+  'admin-archives': ArchiveIcon,
   'request-record': RequestIcon,
   'records-queue': QueueIcon,
   'report-problem': ReportIcon,
@@ -242,7 +275,11 @@ function DashboardLayout({ currentRoute, navItems, children }: DashboardLayoutPr
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Session</p>
             <p className="mt-3 text-sm font-semibold text-[#111827]">{user?.email ?? 'user@recordwise.app'}</p>
             <p className="mt-1 text-sm text-[#6b7280]">
-              {user?.role === 'secretary' ? 'Secretary workspace access is active.' : 'Resident workspace access is active.'}
+              {user?.role === 'admin'
+                ? 'Admin workspace access is active.'
+                : user?.role === 'secretary'
+                  ? 'Secretary workspace access is active.'
+                  : 'Resident workspace access is active.'}
             </p>
             <button
               type="button"
