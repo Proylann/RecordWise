@@ -5,7 +5,6 @@ export function getWorkspaceNav(role?: string): DashboardNavItem[] {
   if (role === 'admin') {
     return [
       { label: 'Dashboard', href: appRoutes.dashboard, route: 'dashboard' },
-      { label: 'AI Assistant', href: appRoutes.assistant, route: 'assistant' },
       { label: 'Resident Management', href: appRoutes.adminResidents, route: 'admin-residents' },
       { label: 'Staff Accounts', href: appRoutes.adminStaff, route: 'admin-staff' },
       { label: 'Requests', href: appRoutes.adminRequests, route: 'admin-requests' },
@@ -20,7 +19,6 @@ export function getWorkspaceNav(role?: string): DashboardNavItem[] {
   if (role === 'secretary') {
     return [
       { label: 'Dashboard', href: appRoutes.dashboard, route: 'dashboard' },
-      { label: 'AI Assistant', href: appRoutes.assistant, route: 'assistant' },
       { label: 'Requests', href: appRoutes.secretaryRequests, route: 'secretary-requests' },
       { label: 'Incident Reports', href: appRoutes.secretaryReports, route: 'secretary-reports' },
       { label: 'Upload Archive', href: appRoutes.archiveRecords, route: 'archive-records' },
@@ -46,7 +44,6 @@ export function getWorkspaceNav(role?: string): DashboardNavItem[] {
 
   return [
     { label: 'Dashboard', href: appRoutes.dashboard, route: 'dashboard' },
-    { label: 'AI Assistant', href: appRoutes.assistant, route: 'assistant' },
     { label: 'Request Record', href: appRoutes.requestRecord, route: 'request-record' },
     { label: 'Records Queue', href: appRoutes.recordsQueue, route: 'records-queue' },
     { label: 'Report Problem', href: appRoutes.reportProblem, route: 'report-problem' },

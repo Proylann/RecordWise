@@ -3,9 +3,9 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import './ChainWise.css'
 import ActivityLogsPage from './pages/ActivityLogs'
-import AssistantPage from './pages/Assistant'
 import BarangayRecordArchivesPage from './pages/BarangayRecordArchives'
 import CertificateIncidentArchivesPage from './pages/CertificateIncidentArchives'
+import AssistantWidget from './components/AssistantWidget'
 import DashboardPage from './pages/Dashboard'
 import LoginPage from './pages/Login'
 import AdminActivitiesPage from './pages/admin/AdminActivities'
@@ -61,9 +61,9 @@ function RequireGuest({ children }: { children: ReactElement }) {
 
 function AppFrame() {
   const location = useLocation()
+  const { isAuthenticated } = useAuth()
   const workspaceRoutes: string[] = [
     appRoutes.dashboard,
-    appRoutes.assistant,
     appRoutes.adminResidents,
     appRoutes.adminStaff,
     appRoutes.adminRequests,
@@ -104,14 +104,6 @@ function AppFrame() {
               <RequireGuest>
                 <RegisterPage />
               </RequireGuest>
-            }
-          />
-          <Route
-            path={appRoutes.assistant}
-            element={
-              <RequireAuth>
-                <AssistantPage />
-              </RequireAuth>
             }
           />
           <Route
@@ -268,6 +260,7 @@ function AppFrame() {
           />
           <Route path="*" element={<Navigate to={appRoutes.login} replace />} />
         </Routes>
+        {isAuthenticated && isWorkspaceRoute ? <AssistantWidget /> : null}
       </div>
     </div>
   )

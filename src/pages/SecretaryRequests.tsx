@@ -62,22 +62,6 @@ function SecretaryRequestsPage() {
     }
   }, [authenticatedFetch, search, showMineOnly])
 
-  async function assignToMe(requestId: string) {
-    const response = await authenticatedFetch(`/record-requests/${requestId}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        status: 'In Progress',
-        notes: `Assigned to ${user?.email}`,
-        assigned_secretary_email: user?.email,
-      }),
-    })
-    const data = await parseApiJson<RecordRequest>(response)
-    if (response.ok && data) {
-      setRequests((current) => current.map((request) => (request.request_id === data.request_id ? data : request)))
-    }
-  }
-
   const filteredRequests = useMemo(() => {
     const activeRequests = requests.filter((request) => request.status === 'Pending' || request.status === 'In Progress')
     if (activeFilter === 'All Requests') {
@@ -92,9 +76,7 @@ function SecretaryRequestsPage() {
         <div className="border-b border-black/6 px-6 py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2f6df6]">Secretary Workspace</p>
           <h1 className="mt-2 text-3xl font-semibold text-[#111827]">Request Section</h1>
-          <p className="mt-2 text-sm text-[#64748b]">
-            Review resident requests, assign ownership, and move each document through the processing workflow.
-          </p>
+          <p className="mt-2 text-sm text-[#64748b]">Review resident requests and move each document through the processing workflow.</p>
           <div className="mt-5 grid gap-3 lg:grid-cols-[1.2fr_auto]">
             <input
               value={search}
@@ -159,23 +141,12 @@ function SecretaryRequestsPage() {
                     </span>
                   </td>
                   <td className="border-t border-black/6 px-6 py-4">
-                    <div className="flex flex-wrap gap-2">
-                      {!request.assigned_secretary_email ? (
-                        <button
-                          type="button"
-                          onClick={() => void assignToMe(request.request_id)}
-                          className="interactive-button inline-flex rounded-xl border border-[#d8deea] bg-white px-4 py-2 text-xs font-semibold text-[#111827] hover:border-[#2f6df6] hover:bg-[#f5f9ff]"
-                        >
-                          Assign to me
-                        </button>
-                      ) : null}
-                      <Link
-                        to={`${appRoutes.processRequest}?request_id=${encodeURIComponent(request.request_id)}`}
-                        className="inline-flex rounded-xl bg-[#111827] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#1f2937] active:translate-y-0 active:scale-[0.98]"
-                      >
-                        Process
-                      </Link>
-                    </div>
+                    <Link
+                      to={`${appRoutes.processRequest}?request_id=${encodeURIComponent(request.request_id)}`}
+                      className="inline-flex rounded-xl bg-[#111827] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#1f2937] active:translate-y-0 active:scale-[0.98]"
+                    >
+                      Process
+                    </Link>
                   </td>
                 </tr>
               ))}

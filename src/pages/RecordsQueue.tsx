@@ -27,6 +27,26 @@ type Notification = {
   created_at: string
 }
 
+function normalizeStatus(status: string) {
+  if (status === 'On Process') {
+    return 'In Progress'
+  }
+  if (status === 'Ready to Pickup') {
+    return 'Ready To Pickup'
+  }
+  return status
+}
+
+function getStatusBadgeClass(status: string) {
+  const normalized = normalizeStatus(status)
+  if (normalized === 'Pending') return 'bg-amber-100 text-amber-800'
+  if (normalized === 'In Progress') return 'bg-blue-100 text-blue-800'
+  if (normalized === 'Ready To Pickup') return 'bg-emerald-100 text-emerald-800'
+  if (normalized === 'Claimed') return 'bg-slate-200 text-slate-800'
+  if (normalized === 'Declined') return 'bg-rose-100 text-rose-800'
+  return 'bg-[#eef4ff] text-[#1d4ed8]'
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value))
 }
@@ -102,16 +122,14 @@ function RecordsQueuePage() {
                     <td className="border-t border-black/6 px-6 py-4">{request.purpose}</td>
                     <td className="border-t border-black/6 px-6 py-4">{formatDate(request.updated_at)}</td>
                     <td className="border-t border-black/6 px-6 py-4">
-                      <span className="rounded-full bg-[#eef4ff] px-3 py-1 text-xs font-semibold text-[#1d4ed8]">{request.status}</span>
-                      <div className="mt-3 space-y-2">
-                        {request.status_history.slice().reverse().map((entry) => (
-                          <div key={`${request.request_id}-${entry.timestamp}-${entry.status}`} className="rounded-2xl border border-[#e2e8f0] bg-[#f8fbff] px-3 py-2">
-                            <p className="text-xs font-semibold text-[#111827]">{entry.status}</p>
-                            <p className="mt-1 text-[11px] text-[#64748b]">{formatDateTime(entry.timestamp)} • {entry.actor_email}</p>
-                            {entry.notes ? <p className="mt-1 text-[11px] text-[#64748b]">{entry.notes}</p> : null}
-                          </div>
-                        ))}
-                      </div>
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(request.status)}`}>
+                        {normalizeStatus(request.status)}
+                      </span>
+                      {request.status_history.length > 0 ? (
+                        <p className="mt-3 text-[11px] text-[#64748b]">
+                          Last update: {formatDateTime(request.status_history[request.status_history.length - 1].timestamp)}
+                        </p>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
