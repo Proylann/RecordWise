@@ -1,5 +1,5 @@
 {
-  "dataset_name": "ChainWise Local Assistant Dataset",
+  "dataset_name": "RecordWise Local Assistant Dataset",
   "trained_at": "2026-03-12T15:13:20.714827Z",
   "vocabulary": [
     "a",
@@ -226,9 +226,9 @@
         "guide"
       ],
       "responses": [
-        "I can guide you through the ChainWise system. Tell me the task you want to do.",
-        "Tell me what you want to do in ChainWise and I will point you to the correct page.",
-        "I am the ChainWise assistant. Ask me about requests, reports, archives, logs, accounts, or your profile."
+        "I can guide you through the RecordWise system. Tell me the task you want to do.",
+        "Tell me what you want to do in RecordWise and I will point you to the correct page.",
+        "I am the RecordWise assistant. Ask me about requests, reports, archives, logs, accounts, or your profile."
       ],
       "steps": [],
       "follow_up": "Example: say 'how do I request a record' or 'where do I check my status'.",
@@ -1133,8 +1133,8 @@
         "enter account"
       ],
       "responses": [
-        "Use the Login page to access ChainWise with your registered email, password, captcha answer, and MFA code if enabled.",
-        "The Login page is the entry point for your ChainWise account."
+        "Use the Login page to access RecordWise with your registered email, password, captcha answer, and MFA code if enabled.",
+        "The Login page is the entry point for your RecordWise account."
       ],
       "steps": [
         "Open the login page.",

@@ -2287,7 +2287,7 @@ def retrain_assistant_model(current_user: dict = Depends(get_current_user)) -> A
         actor_role=get_user_role(current_user),
         action="Retrained AI Assistant",
         target_collection="assistant_model",
-        target_id="chainwise-local-assistant",
+        target_id="recordwise-local-assistant",
         details="Rebuilt the local assistant model from the custom dataset.",
     )
     return AssistantTrainResponse(

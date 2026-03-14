@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { API_BASE_URL, parseApiJson } from '../lib/api'
 import { appRoutes } from '../lib/routes'
+import BrandMark from './BrandMark'
 
 type AuthMode = 'login' | 'register'
 
@@ -215,8 +216,10 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
 
       <div className="w-full max-w-xl rounded-[2.25rem] border border-black/10 bg-[#111111] p-8 shadow-[0_24px_80px_rgba(17,17,17,0.22)] sm:p-10">
         <div className="mb-10 flex flex-col items-center text-center">
-          <div className="mb-6 flex h-18 w-18 items-center justify-center rounded-full border border-white/10 bg-zinc-800 text-zinc-300">
+          <BrandMark className="mb-6 h-18 w-18" />
+          <div className="mb-4 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-300">
             <UserIcon />
+            <span>RecordWise</span>
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h1>
           <p className="mt-3 max-w-md text-sm leading-6 text-zinc-400 sm:text-base">{description}</p>

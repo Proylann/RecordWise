@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { parseApiJson } from '../lib/api'
+import BrandMark from './BrandMark'
 
 type AssistantReply = {
   reply: string
@@ -53,7 +54,7 @@ function AssistantWidget() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'I can guide you through ChainWise. Ask what you want to do and I will point you to the right page.',
+      content: 'I can guide you through RecordWise. Ask what you want to do and I will point you to the right page.',
       suggestions: suggestionSet,
     },
   ])
@@ -127,7 +128,10 @@ function AssistantWidget() {
           <section className="flex h-[min(70vh,620px)] w-[min(calc(100vw-1.5rem),380px)] flex-col overflow-hidden rounded-[1.75rem] border border-[#dbe4f0] bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)]">
             <div className="bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_100%)] px-5 py-4 text-white">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-xl font-semibold">Record Wise A.I assistant</h2>
+                <div className="flex items-center gap-3">
+                  <BrandMark className="h-10 w-10" compact />
+                  <h2 className="text-xl font-semibold">RecordWise AI Assistant</h2>
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
@@ -188,7 +192,7 @@ function AssistantWidget() {
                   value={prompt}
                   onChange={(event) => setPrompt(event.target.value)}
                   rows={2}
-                  placeholder="Ask how to use ChainWise"
+                  placeholder="Ask how to use RecordWise"
                   className="min-h-[64px] flex-1 resize-none rounded-[1.25rem] border border-[#d8deea] bg-[#fcfdff] px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#60a5fa]"
                 />
                 <button

@@ -1,6 +1,7 @@
 import { useState, type ComponentType, type ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import BrandMark from './BrandMark'
 
 export type DashboardRoute =
   | 'dashboard'
@@ -163,9 +164,7 @@ function DashboardLayout({ currentRoute, navItems, children }: DashboardLayoutPr
         <aside className="border-b border-[#d8e2f0] bg-[linear-gradient(180deg,rgba(248,251,255,0.98)_0%,rgba(239,245,255,0.95)_100%)] backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r">
           <div className="flex h-full min-h-0 flex-col px-5 py-6 lg:px-6 lg:py-7">
             <Link to="/dashboard" className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2f6df6] text-sm font-bold tracking-[0.18em] text-white shadow-[0_16px_30px_rgba(47,109,246,0.22)]">
-                RW
-              </div>
+              <BrandMark className="h-11 w-11" />
               <div>
                 <p className="text-sm font-semibold text-[#111827]">RecordWise</p>
                 <p className="text-xs text-[#6b7280]">Trusted Records and Archive Workspace</p>

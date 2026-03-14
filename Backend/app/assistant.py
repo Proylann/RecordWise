@@ -166,7 +166,7 @@ def train_assistant_model() -> dict[str, Any]:
 
     trained_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     model_payload = {
-        "dataset_name": dataset.get("name", "ChainWise Assistant Dataset"),
+        "dataset_name": dataset.get("name", "RecordWise Assistant Dataset"),
         "trained_at": trained_at,
         "vocabulary": vocabulary,
         "idf": idf_map,
@@ -286,7 +286,7 @@ def fallback_reply(role: str) -> AssistantInference:
         ],
     }
     return AssistantInference(
-        reply="I did not fully understand that yet. Ask about a task in ChainWise and I will guide you to the correct page.",
+        reply="I did not fully understand that yet. Ask about a task in RecordWise and I will guide you to the correct page.",
         matched_intent="fallback",
         confidence=0.0,
         route=ROUTE_LIBRARY.get(role, {}).get("assistant"),
