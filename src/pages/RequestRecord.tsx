@@ -11,6 +11,17 @@ const requestTypes = [
   'Business Clearance',
 ]
 
+const requestReasonOptions = [
+  'Employment requirement',
+  'School requirement',
+  'Valid ID requirement',
+  'Business permit requirement',
+  'Financial assistance requirement',
+  'Legal purpose',
+  'Personal record',
+  'Other official purpose',
+]
+
 type RecordRequest = {
   request_id: string
   request_type: string
@@ -106,7 +117,14 @@ function RequestRecordPage() {
                 <option key={option} value={option}>{option}</option>
               ))}
             </select>
-            <textarea value={purpose} onChange={(event) => setPurpose(event.target.value)} required rows={5} placeholder="State the purpose of your request" className="w-full rounded-2xl border border-[#d8deea] bg-[#fcfdff] px-4 py-3.5 text-sm text-[#111827] outline-none" />
+            <select value={purpose} onChange={(event) => setPurpose(event.target.value)} required className="w-full rounded-2xl border border-[#d8deea] bg-[#fcfdff] px-4 py-3.5 text-sm text-[#111827] outline-none">
+              <option value="">Select reason for request</option>
+              {requestReasonOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
             <div className="rounded-2xl border border-dashed border-[#c6d3ea] bg-[#f8fbff] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-[#475569]">{file ? file.name : 'Optional supporting attachment'}</p>

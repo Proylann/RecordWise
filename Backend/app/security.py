@@ -6,7 +6,6 @@ import secrets
 
 import bcrypt
 import jwt
-import pyotp
 
 from app.config import get_settings
 
@@ -75,17 +74,5 @@ def decode_access_token(token: str) -> dict[str, Any]:
     )
 
 
-def generate_totp_secret() -> str:
-    return pyotp.random_base32()
-
-
-def build_totp_uri(*, secret: str, email: str) -> str:
-    return pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="RecordWise")
-
-
-def verify_totp_code(secret: str, code: str) -> bool:
-    if not secret or not code:
-        return False
-
-    totp = pyotp.TOTP(secret)
-    return bool(totp.verify(code.strip(), valid_window=1))
+def generate_email_code() -> str:
+    return f"{secrets.randbelow(900000) + 100000:06d}"

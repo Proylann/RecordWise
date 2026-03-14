@@ -26,7 +26,15 @@ class Settings:
         self.login_rate_limit_attempts = int(os.getenv("LOGIN_RATE_LIMIT_ATTEMPTS", "5"))
         self.login_rate_limit_window_minutes = int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_MINUTES", "15"))
         self.captcha_ttl_minutes = int(os.getenv("CAPTCHA_TTL_MINUTES", "5"))
+        self.mfa_code_ttl_minutes = int(os.getenv("MFA_CODE_TTL_MINUTES", "10"))
         self.max_upload_size_bytes = int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(10 * 1024 * 1024)))
+        self.smtp_host = os.getenv("SMTP_HOST", "").strip()
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_username = os.getenv("SMTP_USERNAME", "").strip()
+        self.smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+        self.smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").strip().lower() != "false"
+        self.smtp_from_email = os.getenv("SMTP_FROM_EMAIL", self.smtp_username).strip()
+        self.smtp_from_name = os.getenv("SMTP_FROM_NAME", "RecordWise").strip() or "RecordWise"
         self.ganache_rpc_url = os.getenv("GANACHE_RPC_URL", "http://127.0.0.1:7546").strip() or "http://127.0.0.1:7546"
         self.ganache_network_id = int(os.getenv("GANACHE_NETWORK_ID", "5777"))
         self.ganache_private_key = os.getenv("GANACHE_PRIVATE_KEY", "").strip()

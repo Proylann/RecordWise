@@ -21,6 +21,7 @@ from web3 import Web3
 from app.assistant import ensure_assistant_model, generate_assistant_reply, get_assistant_status, train_assistant_model
 from app.config import get_settings
 from app.database import get_database, ping_database
+from app.mailer import send_email
 from app.schemas import (
     ActivitySummaryResponse,
     ActivityLogResponse,
@@ -36,11 +37,18 @@ from app.schemas import (
     AuthResponse,
     CaptchaResponse,
     CommunityReportResponse,
+    LoginVerifyRequest,
     LoginRequest,
     MessageResponse,
     MfaCodeRequest,
     MfaSetupResponse,
     NotificationResponse,
+    PendingAuthResponse,
+    PasswordChangeRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetRequest,
+    PasswordResetVerifyRequest,
+    ProfileUpdateRequest,
     RecordRequestResponse,
     RecordInsightResponse,
     RecordListResponse,
@@ -53,14 +61,12 @@ from app.schemas import (
 )
 from app.security import (
     PASSWORD_POLICY_MESSAGE,
-    build_totp_uri,
     create_access_token,
     decode_access_token,
+    generate_email_code,
     generate_session_id,
-    generate_totp_secret,
     hash_password,
     verify_password,
-    verify_totp_code,
 )
 
 
@@ -171,8 +177,6 @@ def ensure_default_admin_account() -> None:
             "purok": None,
             "role": "admin",
             "mfa_enabled": False,
-            "mfa_secret": None,
-            "mfa_pending_secret": None,
             "archived": False,
             "archived_at": None,
             "created_at": now,
@@ -214,6 +218,21 @@ def get_captcha_collection():
     return collection
 
 
+def get_mfa_codes_collection():
+    collection = get_database()["mfa_codes"]
+    collection.create_index("expires_at", expireAfterSeconds=0)
+    collection.create_index([("email", 1), ("purpose", 1), ("created_at", -1)])
+    return collection
+
+
+def get_pending_login_collection():
+    collection = get_database()["pending_logins"]
+    collection.create_index("login_ticket", unique=True)
+    collection.create_index("expires_at", expireAfterSeconds=0)
+    collection.create_index([("email", 1), ("created_at", -1)])
+    return collection
+
+
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -243,6 +262,10 @@ def get_user_role(document: dict) -> str:
     return role
 
 
+def is_mfa_required_for_user(document: dict) -> bool:
+    return get_user_role(document) == "secretary" or bool(document.get("mfa_enabled"))
+
+
 def serialize_user(document: dict) -> UserResponse:
     return UserResponse(
         email=document["email"],
@@ -250,7 +273,7 @@ def serialize_user(document: dict) -> UserResponse:
         middle_name=document.get("middle_name"),
         last_name=document.get("last_name"),
         purok=document.get("purok"),
-        mfa_enabled=bool(document.get("mfa_enabled")),
+        mfa_enabled=is_mfa_required_for_user(document),
         role=get_user_role(document),
     )
 
@@ -262,7 +285,7 @@ def serialize_admin_user(document: dict) -> AdminUserResponse:
         middle_name=document.get("middle_name"),
         last_name=document.get("last_name"),
         purok=document.get("purok"),
-        mfa_enabled=bool(document.get("mfa_enabled")),
+        mfa_enabled=is_mfa_required_for_user(document),
         role=get_user_role(document),
         archived=bool(document.get("archived", False)),
         created_at=isoformat(as_utc(document["created_at"])) if document.get("created_at") else None,
@@ -801,7 +824,14 @@ def login_error() -> HTTPException:
 def mfa_required_error() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="MFA code required",
+        detail="MFA code required. A verification code was sent to your email.",
+    )
+
+
+def smtp_not_configured_error() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="SMTP is not configured for MFA delivery.",
     )
 
 
@@ -930,7 +960,69 @@ def clear_failed_logins(email: str, ip_address: str) -> None:
     get_login_attempts_collection().delete_many({"email": email})
 
 
-def login_error_with_attempts(attempts_used: int) -> HTTPException:
+def send_mfa_code(email: str, purpose: str) -> None:
+    collection = get_mfa_codes_collection()
+    collection.delete_many({"email": email, "purpose": purpose})
+    now = datetime.now(UTC)
+    code = generate_email_code()
+    expires_at = now + timedelta(minutes=settings.mfa_code_ttl_minutes)
+    collection.insert_one(
+        {
+            "email": email,
+            "purpose": purpose,
+            "code": code,
+            "created_at": now,
+            "expires_at": expires_at,
+        }
+    )
+    purpose_labels = {
+        "login": "sign in",
+        "enable_mfa": "enable multi-factor authentication",
+        "disable_mfa": "disable multi-factor authentication",
+        "password_reset": "reset your password",
+    }
+    try:
+        send_email(
+            to_email=email,
+            subject="RecordWise verification code",
+            body=(
+                f"Your RecordWise verification code is {code}.\n\n"
+                f"Use this code to {purpose_labels.get(purpose, 'complete verification')}.\n"
+                f"This code expires in {settings.mfa_code_ttl_minutes} minutes."
+            ),
+        )
+    except RuntimeError as exc:
+        collection.delete_many({"email": email, "purpose": purpose})
+        raise smtp_not_configured_error() from exc
+    except Exception as exc:  # pragma: no cover
+        collection.delete_many({"email": email, "purpose": purpose})
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to deliver MFA code email.",
+        ) from exc
+
+
+def verify_mfa_code(*, email: str, purpose: str, code: str) -> bool:
+    collection = get_mfa_codes_collection()
+    document = collection.find_one({"email": email, "purpose": purpose, "code": code.strip()})
+    if not document:
+        return False
+    if as_utc(document["expires_at"]) <= datetime.now(UTC):
+        collection.delete_one({"_id": document["_id"]})
+        return False
+    collection.delete_one({"_id": document["_id"]})
+    return True
+
+
+def request_password_reset_code(email: str) -> None:
+    users = get_users_collection()
+    user_document = users.find_one({"email": email, "archived": {"$ne": True}})
+    if not user_document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    send_mfa_code(email, "password_reset")
+
+
+def login_error_with_attempts(attempts_used: int, message_prefix: str = "Invalid login credentials.") -> HTTPException:
     attempts_left = max(settings.login_rate_limit_attempts - attempts_used, 0)
     if attempts_left == 0:
         return HTTPException(
@@ -940,7 +1032,7 @@ def login_error_with_attempts(attempts_used: int) -> HTTPException:
 
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=f"Invalid login credentials. {attempts_left} trial(s) left.",
+        detail=f"{message_prefix} {attempts_left} trial(s) left.",
     )
 
 
@@ -1038,8 +1130,6 @@ def register(payload: dict) -> AuthResponse:
         "purok": register_payload.purok.strip(),
         "role": "resident",
         "mfa_enabled": False,
-        "mfa_secret": None,
-        "mfa_pending_secret": None,
         "created_at": datetime.now(UTC),
     }
     users.insert_one(user_document)
@@ -1055,9 +1145,10 @@ def register(payload: dict) -> AuthResponse:
     return create_session(user_document)
 
 
-@app.post("/auth/login", response_model=AuthResponse)
-def login(payload: LoginRequest, request: Request) -> AuthResponse:
+@app.post("/auth/login", response_model=AuthResponse | PendingAuthResponse)
+def login(payload: LoginRequest, request: Request) -> AuthResponse | PendingAuthResponse:
     users = get_users_collection()
+    pending_logins = get_pending_login_collection()
     email = normalize_email(payload.email)
     ip_address = get_client_ip(request)
 
@@ -1073,15 +1164,62 @@ def login(payload: LoginRequest, request: Request) -> AuthResponse:
         invalidate_captcha(captcha_challenge)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is archived")
 
-    if user_document.get("mfa_enabled"):
+    mfa_required = is_mfa_required_for_user(user_document)
+    if mfa_required:
         if not payload.mfa_code:
-            raise mfa_required_error()
-        if not verify_totp_code(user_document.get("mfa_secret", ""), payload.mfa_code):
+            pending_logins.delete_many({"email": email})
+            expires_at = datetime.now(UTC) + timedelta(minutes=settings.mfa_code_ttl_minutes)
+            login_ticket = uuid4().hex
+            pending_logins.insert_one(
+                {
+                    "login_ticket": login_ticket,
+                    "email": email,
+                    "ip_address": ip_address,
+                    "created_at": datetime.now(UTC),
+                    "expires_at": expires_at,
+                }
+            )
+            send_mfa_code(email, "login")
+            mark_captcha_used(captcha_challenge)
+            return PendingAuthResponse(
+                login_ticket=login_ticket,
+                email=email,
+                expires_at=isoformat(expires_at),
+                message="Verification code required. A code was sent to your email.",
+            )
+        if not verify_mfa_code(email=email, purpose="login", code=payload.mfa_code):
             invalidate_captcha(captcha_challenge)
             attempts_used = record_failed_login(email, ip_address)
             raise login_error_with_attempts(attempts_used)
 
     mark_captcha_used(captcha_challenge)
+    clear_failed_logins(email, ip_address)
+    return create_session(user_document)
+
+
+@app.post("/auth/login/verify", response_model=AuthResponse)
+def verify_login(payload: LoginVerifyRequest) -> AuthResponse:
+    pending_logins = get_pending_login_collection()
+    pending_login = pending_logins.find_one({"login_ticket": payload.login_ticket})
+    if not pending_login:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Login verification has expired. Please sign in again.")
+
+    if as_utc(pending_login["expires_at"]) <= datetime.now(UTC):
+        pending_logins.delete_one({"_id": pending_login["_id"]})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Login verification has expired. Please sign in again.")
+
+    email = pending_login["email"]
+    ip_address = pending_login.get("ip_address", "unknown")
+    user_document = get_users_collection().find_one({"email": email})
+    if not user_document or user_document.get("archived"):
+        pending_logins.delete_one({"_id": pending_login["_id"]})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Login verification is no longer valid. Please sign in again.")
+
+    if not verify_mfa_code(email=email, purpose="login", code=payload.code):
+        attempts_used = record_failed_login(email, ip_address)
+        raise login_error_with_attempts(attempts_used, "Invalid or expired OTP.")
+
+    pending_logins.delete_one({"_id": pending_login["_id"]})
     clear_failed_logins(email, ip_address)
     return create_session(user_document)
 
@@ -1095,30 +1233,83 @@ def logout(current_user: dict = Depends(get_current_user)) -> MessageResponse:
     return MessageResponse(message="Logged out successfully")
 
 
+@app.post("/auth/password-reset/request", response_model=MessageResponse)
+def password_reset_request(payload: PasswordResetRequest) -> MessageResponse:
+    email = normalize_email(payload.email)
+    request_password_reset_code(email)
+    return MessageResponse(message="Password reset code was sent to the email address.")
+
+
+@app.post("/auth/password-reset/verify", response_model=MessageResponse)
+def password_reset_verify(payload: PasswordResetVerifyRequest) -> MessageResponse:
+    email = normalize_email(payload.email)
+    users = get_users_collection()
+    latest_user = users.find_one({"email": email, "archived": {"$ne": True}})
+    if not latest_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    if not verify_mfa_code(email=email, purpose="password_reset", code=payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset code")
+    get_mfa_codes_collection().delete_many({"email": email, "purpose": "password_reset_verified"})
+    get_mfa_codes_collection().insert_one(
+        {
+            "email": email,
+            "purpose": "password_reset_verified",
+            "code": payload.code.strip(),
+            "created_at": datetime.now(UTC),
+            "expires_at": datetime.now(UTC) + timedelta(minutes=settings.mfa_code_ttl_minutes),
+        }
+    )
+    return MessageResponse(message="OTP verified. You can now change your password.")
+
+
+@app.post("/auth/password-reset/confirm", response_model=MessageResponse)
+def password_reset_confirm(payload: PasswordResetConfirmRequest) -> MessageResponse:
+    users = get_users_collection()
+    email = normalize_email(payload.email)
+    latest_user = users.find_one({"email": email, "archived": {"$ne": True}})
+    if not latest_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    if not verify_mfa_code(email=email, purpose="password_reset_verified", code=payload.code):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset code")
+
+    users.update_one(
+        {"_id": latest_user["_id"]},
+        {"$set": {"password_hash": hash_password(payload.new_password), "updated_at": datetime.now(UTC)}},
+    )
+    get_sessions_collection().update_many(
+        {"user_email": email, "revoked_at": None},
+        {"$set": {"revoked_at": datetime.now(UTC), "expires_at": datetime.now(UTC)}},
+    )
+    log_activity(
+        actor_email=email,
+        actor_role=get_user_role(latest_user),
+        action="Reset Password",
+        target_collection="users",
+        target_id=email,
+        details="Password reset completed using emailed OTP.",
+    )
+    return MessageResponse(message="Password reset successful. You may now sign in.")
+
+
 @app.post("/auth/mfa/setup", response_model=MfaSetupResponse)
 def setup_mfa(current_user: dict = Depends(get_current_user)) -> MfaSetupResponse:
-    users = get_users_collection()
-    secret = generate_totp_secret()
-    users.update_one(
-        {"email": current_user["email"]},
-        {"$set": {"mfa_pending_secret": secret}},
+    send_mfa_code(current_user["email"], "enable_mfa")
+    return MfaSetupResponse(
+        message="A verification code was sent to your email address.",
+        expires_in_minutes=settings.mfa_code_ttl_minutes,
     )
-    return MfaSetupResponse(secret=secret, otpauth_url=build_totp_uri(secret=secret, email=current_user["email"]))
 
 
 @app.post("/auth/mfa/enable", response_model=MessageResponse)
 def enable_mfa(payload: MfaCodeRequest, current_user: dict = Depends(get_current_user)) -> MessageResponse:
     users = get_users_collection()
-    latest_user = users.find_one({"email": current_user["email"]})
-    pending_secret = latest_user.get("mfa_pending_secret") if latest_user else None
-    if not pending_secret or not verify_totp_code(pending_secret, payload.code):
+    if not verify_mfa_code(email=current_user["email"], purpose="enable_mfa", code=payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code")
 
     users.update_one(
         {"email": current_user["email"]},
         {
-            "$set": {"mfa_enabled": True, "mfa_secret": pending_secret},
-            "$unset": {"mfa_pending_secret": ""},
+            "$set": {"mfa_enabled": True, "updated_at": datetime.now(UTC)},
         },
     )
     return MessageResponse(message="MFA has been enabled")
@@ -1126,20 +1317,83 @@ def enable_mfa(payload: MfaCodeRequest, current_user: dict = Depends(get_current
 
 @app.post("/auth/mfa/disable", response_model=MessageResponse)
 def disable_mfa(payload: MfaCodeRequest, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    if get_user_role(current_user) == "secretary":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Secretary accounts must keep MFA enabled")
+
     users = get_users_collection()
-    latest_user = users.find_one({"email": current_user["email"]})
-    current_secret = latest_user.get("mfa_secret") if latest_user else None
-    if not current_secret or not verify_totp_code(current_secret, payload.code):
+    if not verify_mfa_code(email=current_user["email"], purpose="disable_mfa", code=payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code")
 
     users.update_one(
         {"email": current_user["email"]},
         {
-            "$set": {"mfa_enabled": False},
-            "$unset": {"mfa_secret": "", "mfa_pending_secret": ""},
+            "$set": {"mfa_enabled": False, "updated_at": datetime.now(UTC)},
         },
     )
     return MessageResponse(message="MFA has been disabled")
+
+
+@app.post("/auth/mfa/disable/request", response_model=MessageResponse)
+def request_disable_mfa(current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    if get_user_role(current_user) == "secretary":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Secretary accounts must keep MFA enabled")
+
+    send_mfa_code(current_user["email"], "disable_mfa")
+    return MessageResponse(message="A verification code was sent to your email address.")
+
+
+@app.patch("/auth/profile", response_model=UserResponse)
+def update_profile(payload: ProfileUpdateRequest, current_user: dict = Depends(get_current_user)) -> UserResponse:
+    users = get_users_collection()
+    users.update_one(
+        {"email": current_user["email"]},
+        {
+            "$set": {
+                "first_name": payload.first_name,
+                "middle_name": payload.middle_name,
+                "last_name": payload.last_name,
+                "updated_at": datetime.now(UTC),
+            }
+        },
+    )
+    updated = users.find_one({"email": current_user["email"]})
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role=get_user_role(updated),
+        action="Updated Profile",
+        target_collection="users",
+        target_id=current_user["email"],
+        details="Account name details updated from profile settings.",
+    )
+    return serialize_user(updated)
+
+
+@app.post("/auth/change-password", response_model=MessageResponse)
+def change_password(payload: PasswordChangeRequest, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    users = get_users_collection()
+    latest_user = users.find_one({"email": current_user["email"]})
+    if not latest_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not verify_password(payload.current_password, latest_user.get("password_hash", "")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be different from the current password")
+
+    users.update_one(
+        {"_id": latest_user["_id"]},
+        {"$set": {"password_hash": hash_password(payload.new_password), "updated_at": datetime.now(UTC)}},
+    )
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role=get_user_role(latest_user),
+        action="Changed Password",
+        target_collection="users",
+        target_id=current_user["email"],
+        details="Password updated from profile settings.",
+    )
+    return MessageResponse(message="Password updated successfully")
 
 
 @app.get("/admin/summary", response_model=ActivitySummaryResponse)
@@ -1198,9 +1452,7 @@ def create_admin_user(payload: AdminUserCreateRequest, current_user: dict = Depe
         "password_hash": hash_password(payload.password),
         "purok": payload.purok,
         "role": payload.role,
-        "mfa_enabled": False,
-        "mfa_secret": None,
-        "mfa_pending_secret": None,
+        "mfa_enabled": payload.role == "secretary",
         "archived": False,
         "archived_at": None,
         "created_at": now,
@@ -1240,6 +1492,7 @@ def update_admin_user(
         "purok": payload.purok,
         "role": payload.role,
         "archived": payload.archived,
+        "mfa_enabled": payload.role == "secretary" or bool(document.get("mfa_enabled", False)),
         "updated_at": now,
         "archived_at": now if payload.archived else None,
     }
@@ -1258,6 +1511,28 @@ def update_admin_user(
         details=f"Updated {payload.role} account details. Archived={payload.archived}.",
     )
     return serialize_admin_user(updated)
+
+
+@app.delete("/admin/users/{email:path}/permanent", response_model=MessageResponse)
+def delete_admin_user(email: str, current_user: dict = Depends(get_current_user)) -> MessageResponse:
+    require_roles(current_user, "admin")
+    normalized_email = normalize_email(email)
+    if normalized_email == "admin@recordwise.com":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Default admin account cannot be deleted")
+    if normalized_email == normalize_email(current_user["email"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your current account")
+    result = get_users_collection().delete_one({"email": normalized_email})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    log_activity(
+        actor_email=current_user["email"],
+        actor_role="admin",
+        action="Deleted User Account",
+        target_collection="users",
+        target_id=normalized_email,
+        details="User account permanently deleted from the admin workspace.",
+    )
+    return MessageResponse(message="User deleted successfully")
 
 
 @app.delete("/admin/users/{email:path}", response_model=MessageResponse)
@@ -1281,28 +1556,6 @@ def archive_admin_user(email: str, current_user: dict = Depends(get_current_user
         details="User account moved to archives.",
     )
     return MessageResponse(message="User archived successfully")
-
-
-@app.delete("/admin/users/{email:path}/permanent", response_model=MessageResponse)
-def delete_admin_user(email: str, current_user: dict = Depends(get_current_user)) -> MessageResponse:
-    require_roles(current_user, "admin")
-    normalized_email = normalize_email(email)
-    if normalized_email == "admin@recordwise.com":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Default admin account cannot be deleted")
-    if normalized_email == normalize_email(current_user["email"]):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your current account")
-    result = get_users_collection().delete_one({"email": normalized_email})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    log_activity(
-        actor_email=current_user["email"],
-        actor_role="admin",
-        action="Deleted User Account",
-        target_collection="users",
-        target_id=normalized_email,
-        details="User account permanently deleted from the admin workspace.",
-    )
-    return MessageResponse(message="User deleted successfully")
 
 
 @app.post("/admin/users/{email:path}/restore", response_model=AdminUserResponse)
@@ -1936,9 +2189,16 @@ def list_activity_logs(
     current_user: dict = Depends(get_current_user),
 ) -> list[ActivityLogResponse]:
     require_roles(current_user, "secretary", "admin")
-    query: dict = {}
+    role = get_user_role(current_user)
+    query: dict = {"actor_email": current_user["email"]} if role == "secretary" else {}
     if actor_email:
-        query["actor_email"] = {"$regex": actor_email.strip(), "$options": "i"}
+        if role == "secretary":
+            requested_actor_email = normalize_email(actor_email)
+            if requested_actor_email != current_user["email"]:
+                return []
+            query["actor_email"] = current_user["email"]
+        else:
+            query["actor_email"] = {"$regex": actor_email.strip(), "$options": "i"}
     if target_collection:
         query["target_collection"] = target_collection.strip()
     date_query = build_date_range_query(date_from, date_to)

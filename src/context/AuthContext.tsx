@@ -21,14 +21,27 @@ type LoginOptions = {
   remember?: boolean
   captchaId: string
   captchaAnswer: string
-  mfaCode?: string
+}
+
+type LoginResult =
+  | { status: 'authenticated' }
+  | { status: 'mfa_required'; email: string; expiresAt: string; message: string }
+
+type PendingLogin = {
+  email: string
+  loginTicket: string
+  expiresAt: string
+  remember: boolean
 }
 
 interface AuthContextType {
   isAuthenticated: boolean
   token: string | null
   user: User | null
-  login: (email: string, password: string, options: LoginOptions) => Promise<void>
+  pendingLogin: PendingLogin | null
+  login: (email: string, password: string, options: LoginOptions) => Promise<LoginResult>
+  verifyPendingLogin: (code: string) => Promise<void>
+  clearPendingLogin: () => void
   register: (
     firstName: string,
     middleName: string,
@@ -45,8 +58,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const AUTH_TOKEN_KEY = 'authToken'
 const USER_DATA_KEY = 'userData'
+const PENDING_LOGIN_KEY = 'pendingLogin'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000
+
+function redirectToLogin() {
+  window.location.replace(`${window.location.pathname}${window.location.search}#/login`)
+}
 
 type AuthApiResponse = {
   token: string
@@ -60,6 +78,14 @@ type AuthApiResponse = {
     mfa_enabled?: boolean
     role?: string
   }
+}
+
+type PendingAuthApiResponse = {
+  requires_mfa: true
+  login_ticket: string
+  email: string
+  expires_at: string
+  message: string
 }
 
 type UserApiResponse = {
@@ -89,6 +115,14 @@ function clearAuthStorage() {
   sessionStorage.removeItem(USER_DATA_KEY)
 }
 
+function persistPendingLogin(pendingLogin: PendingLogin) {
+  sessionStorage.setItem(PENDING_LOGIN_KEY, JSON.stringify(pendingLogin))
+}
+
+function clearPendingLoginStorage() {
+  sessionStorage.removeItem(PENDING_LOGIN_KEY)
+}
+
 function normalizeUser(user: AuthApiResponse['user'] | UserApiResponse): User {
   return {
     email: user.email,
@@ -109,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [token, setToken] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
+  const [pendingLogin, setPendingLogin] = useState<PendingLogin | null>(null)
   const [loading, setLoading] = useState(true)
   const inactivityTimerRef = useRef<number | null>(null)
   const tokenRef = useRef<string | null>(null)
@@ -126,6 +161,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     inactivityTimerRef.current = window.setTimeout(() => {
       void logoutRef.current()
     }, INACTIVITY_TIMEOUT_MS)
+  }
+
+  function clearPendingLogin() {
+    clearPendingLoginStorage()
+    setPendingLogin(null)
   }
 
   function clearState() {
@@ -154,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (response.status === 401) {
       clearState()
-      window.location.hash = '#/login'
+      redirectToLogin()
       throw new Error('Your session has expired. Please sign in again.')
     }
 
@@ -185,8 +225,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify(payload),
     })
 
-    const data = (await parseJson<AuthApiResponse | { detail?: string }>(response)) as
+    const data = (await parseJson<AuthApiResponse | PendingAuthApiResponse | { detail?: string }>(response)) as
       | AuthApiResponse
+      | PendingAuthApiResponse
       | { detail?: string }
       | null
 
@@ -194,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data && 'detail' in data && data.detail ? data.detail : 'Request failed')
     }
 
-    if (!data || !('token' in data) || !('user' in data)) {
+    if (!data) {
       throw new Error('Invalid server response')
     }
 
@@ -217,7 +258,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     clearState()
-    window.location.hash = '#/login'
+    clearPendingLogin()
+    redirectToLogin()
   }
 
   useEffect(() => {
@@ -231,8 +273,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem(AUTH_TOKEN_KEY) ?? sessionStorage.getItem(AUTH_TOKEN_KEY)
     const storedUser = localStorage.getItem(USER_DATA_KEY) ?? sessionStorage.getItem(USER_DATA_KEY)
+    const storedPendingLogin = sessionStorage.getItem(PENDING_LOGIN_KEY)
 
     async function restoreSession() {
+      if (storedPendingLogin) {
+        try {
+          setPendingLogin(JSON.parse(storedPendingLogin) as PendingLogin)
+        } catch {
+          clearPendingLoginStorage()
+        }
+      }
+
       if (!storedToken || !storedUser) {
         setLoading(false)
         return
@@ -254,6 +305,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void restoreSession()
   }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      clearPendingLogin()
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -288,7 +345,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated])
 
-  const login = async (email: string, password: string, options: LoginOptions) => {
+  const login = async (email: string, password: string, options: LoginOptions): Promise<LoginResult> => {
     if (!email || !password) {
       throw new Error('Email and password are required')
     }
@@ -298,10 +355,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       captcha_id: options.captchaId,
       captcha_answer: options.captchaAnswer,
-      mfa_code: options.mfaCode?.trim() || undefined,
     })
+
+    if ('requires_mfa' in response && response.requires_mfa) {
+      const nextPendingLogin = {
+        email: response.email,
+        loginTicket: response.login_ticket,
+        expiresAt: response.expires_at,
+        remember: options.remember ?? true,
+      }
+      persistPendingLogin(nextPendingLogin)
+      setPendingLogin(nextPendingLogin)
+      return {
+        status: 'mfa_required',
+        email: response.email,
+        expiresAt: response.expires_at,
+        message: response.message,
+      }
+    }
+
+    if (!('token' in response) || !('user' in response)) {
+      throw new Error('Invalid server response')
+    }
+
+    clearPendingLogin()
     const normalizedUser = normalizeUser(response.user)
     persistAuth(response.token, normalizedUser, options.remember ?? true)
+    tokenRef.current = response.token
+    setToken(response.token)
+    setUser(normalizedUser)
+    setIsAuthenticated(true)
+    return { status: 'authenticated' }
+  }
+
+  const verifyPendingLogin = async (code: string) => {
+    if (!pendingLogin) {
+      throw new Error('Login verification has expired. Please sign in again.')
+    }
+    if (!code.trim()) {
+      throw new Error('Verification code is required')
+    }
+
+    const response = await requestAuth('/auth/login/verify', {
+      login_ticket: pendingLogin.loginTicket,
+      code: code.trim(),
+    })
+
+    if (!('token' in response) || !('user' in response)) {
+      throw new Error('Invalid server response')
+    }
+
+    clearPendingLogin()
+    const normalizedUser = normalizeUser(response.user)
+    persistAuth(response.token, normalizedUser, pendingLogin.remember)
     tokenRef.current = response.token
     setToken(response.token)
     setUser(normalizedUser)
@@ -328,6 +434,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       purok,
       password,
     })
+
+    if (!('token' in response) || !('user' in response)) {
+      throw new Error('Invalid server response')
+    }
+
     const normalizedUser = normalizeUser(response.user)
     persistAuth(response.token, normalizedUser)
     tokenRef.current = response.token
@@ -346,7 +457,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         token,
         user,
+        pendingLogin,
         login,
+        verifyPendingLogin,
+        clearPendingLogin,
         register,
         logout,
         refreshUser,

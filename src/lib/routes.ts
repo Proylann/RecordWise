@@ -1,6 +1,8 @@
 export const appRoutes = {
   register: '/register',
   login: '/login',
+  loginVerify: '/login/verify',
+  forgotPassword: '/forgot-password',
   dashboard: '/dashboard',
   adminResidents: '/admin/residents',
   adminStaff: '/admin/staff',

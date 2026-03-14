@@ -52,7 +52,6 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
   const [captchaId, setCaptchaId] = useState('')
   const [captchaQuestion, setCaptchaQuestion] = useState('')
   const [isCaptchaLoading, setIsCaptchaLoading] = useState(false)
-  const [requiresMfa, setRequiresMfa] = useState(false)
   const [formData, setFormData] = useState({
     firstName: '',
     middleName: '',
@@ -62,7 +61,6 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
     password: '',
     confirmPassword: '',
     captchaAnswer: '',
-    mfaCode: '',
   })
 
   const title = isLogin ? 'Sign in to your account' : 'Create your account'
@@ -111,12 +109,6 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
   }, [isLogin])
 
   function updateField(field: keyof typeof formData, value: string) {
-    if (field === 'email' || field === 'password') {
-      setRequiresMfa(false)
-      setFormData((current) => ({ ...current, [field]: value, mfaCode: '' }))
-      return
-    }
-
     setFormData((current) => ({ ...current, [field]: value }))
   }
 
@@ -127,12 +119,15 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
 
     try {
       if (isLogin) {
-        await login(formData.email.trim(), formData.password, {
+        const result = await login(formData.email.trim(), formData.password, {
           remember: keepLoggedIn,
           captchaId,
           captchaAnswer: formData.captchaAnswer.trim(),
-          mfaCode: requiresMfa ? formData.mfaCode.trim() : undefined,
         })
+        if (result.status === 'mfa_required') {
+          navigate(appRoutes.loginVerify)
+          return
+        }
       } else {
         if (formData.password !== formData.confirmPassword) {
           throw new Error('Passwords do not match')
@@ -164,13 +159,6 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : 'Unable to continue'
       setError(message)
-
-      if (message === 'MFA code required') {
-        setRequiresMfa(true)
-        return
-      }
-
-      setRequiresMfa(false)
       if (isLogin) {
         await loadCaptcha()
       }
@@ -284,7 +272,6 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
               {renderInput('captchaAnswer', 'Captcha Answer', 'Solve the captcha')}
             </div>
           )}
-          {isLogin && requiresMfa && renderInput('mfaCode', 'MFA Code', 'Enter your authenticator code', 'text', false)}
           {!isLogin &&
             renderInput('confirmPassword', 'Confirm Password', 'Confirm your password', 'password', true)}
 
@@ -300,7 +287,7 @@ function AuthPageLayout({ mode }: AuthPageLayoutProps) {
                 <span>Keep me logged in</span>
               </label>
 
-              <Link to={appRoutes.login} className="text-zinc-400 transition hover:text-white">
+              <Link to={appRoutes.forgotPassword} className="text-zinc-400 transition hover:text-white">
                 Forgot password?
               </Link>
             </div>

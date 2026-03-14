@@ -20,6 +20,17 @@ def validate_person_name(value: str, field_label: str) -> str:
     return cleaned
 
 
+def validate_optional_person_name(value: str | None, field_label: str) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if not NAME_PATTERN.fullmatch(cleaned):
+        raise ValueError(f"{field_label} may only contain letters, spaces, apostrophes, periods, and hyphens")
+    return cleaned
+
+
 class RegisterRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     middle_name: str = Field(min_length=1, max_length=100)
@@ -69,6 +80,14 @@ class AuthResponse(BaseModel):
     user: UserResponse
 
 
+class PendingAuthResponse(BaseModel):
+    requires_mfa: bool = True
+    login_ticket: str
+    email: str
+    expires_at: str
+    message: str
+
+
 class CaptchaResponse(BaseModel):
     captcha_id: str
     question: str
@@ -80,12 +99,61 @@ class MessageResponse(BaseModel):
 
 
 class MfaSetupResponse(BaseModel):
-    secret: str
-    otpauth_url: str
+    message: str
+    delivery: str = "email"
+    expires_in_minutes: int
 
 
 class MfaCodeRequest(BaseModel):
     code: str = Field(min_length=6, max_length=12)
+
+
+class LoginVerifyRequest(BaseModel):
+    login_ticket: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=6, max_length=12)
+
+
+class ProfileUpdateRequest(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "ProfileUpdateRequest":
+        self.first_name = validate_person_name(self.first_name, "First name")
+        self.middle_name = validate_person_name(self.middle_name, "Middle name")
+        self.last_name = validate_person_name(self.last_name, "Last name")
+        return self
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "PasswordChangeRequest":
+        validate_password_policy(self.new_password)
+        return self
+
+
+class PasswordResetRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class PasswordResetVerifyRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    code: str = Field(min_length=6, max_length=12)
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    code: str = Field(min_length=6, max_length=12)
+    new_password: str = Field(min_length=12, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_values(self) -> "PasswordResetConfirmRequest":
+        validate_password_policy(self.new_password)
+        return self
 
 
 class AuditEntryResponse(BaseModel):
@@ -241,7 +309,7 @@ class AdminUserResponse(BaseModel):
 
 class AdminUserCreateRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
-    middle_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     email: str = Field(min_length=3, max_length=254)
     purok: str | None = Field(default=None, max_length=20)
@@ -252,7 +320,7 @@ class AdminUserCreateRequest(BaseModel):
     def validate_values(self) -> "AdminUserCreateRequest":
         validate_password_policy(self.password)
         self.first_name = validate_person_name(self.first_name, "First name")
-        self.middle_name = validate_person_name(self.middle_name, "Middle name")
+        self.middle_name = validate_optional_person_name(self.middle_name, "Middle name")
         self.last_name = validate_person_name(self.last_name, "Last name")
         self.role = self.role.strip().lower()
         if self.role not in VALID_USER_ROLES:
@@ -268,7 +336,7 @@ class AdminUserCreateRequest(BaseModel):
 
 class AdminUserUpdateRequest(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
-    middle_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     purok: str | None = Field(default=None, max_length=20)
     password: str | None = Field(default=None, min_length=12, max_length=128)
@@ -280,7 +348,7 @@ class AdminUserUpdateRequest(BaseModel):
         if self.password:
             validate_password_policy(self.password)
         self.first_name = validate_person_name(self.first_name, "First name")
-        self.middle_name = validate_person_name(self.middle_name, "Middle name")
+        self.middle_name = validate_optional_person_name(self.middle_name, "Middle name")
         self.last_name = validate_person_name(self.last_name, "Last name")
         self.role = self.role.strip().lower()
         if self.role not in VALID_USER_ROLES:

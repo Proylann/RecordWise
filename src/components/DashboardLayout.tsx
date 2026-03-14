@@ -156,119 +156,125 @@ function DashboardLayout({ currentRoute, navItems, children }: DashboardLayoutPr
   )
 
   return (
-    <section className="relative min-h-screen w-full overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_45%,#f8fafc_100%)]">
+    <section className="relative min-h-screen w-full bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_45%,#f8fafc_100%)]">
       <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.16),_transparent_58%)]" />
 
       <div className="relative grid min-h-screen lg:grid-cols-[290px_minmax(0,1fr)]">
-        <aside className="border-b border-[#d8e2f0] bg-[linear-gradient(180deg,rgba(248,251,255,0.98)_0%,rgba(239,245,255,0.95)_100%)] px-5 py-6 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r lg:px-6 lg:py-7">
-          <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2f6df6] text-sm font-bold tracking-[0.18em] text-white shadow-[0_16px_30px_rgba(47,109,246,0.22)]">
-              RW
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#111827]">RecordWise</p>
-              <p className="text-xs text-[#6b7280]">Trusted Records and Archive Workspace</p>
-            </div>
-          </Link>
+        <aside className="border-b border-[#d8e2f0] bg-[linear-gradient(180deg,rgba(248,251,255,0.98)_0%,rgba(239,245,255,0.95)_100%)] backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r">
+          <div className="flex h-full min-h-0 flex-col px-5 py-6 lg:px-6 lg:py-7">
+            <Link to="/dashboard" className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2f6df6] text-sm font-bold tracking-[0.18em] text-white shadow-[0_16px_30px_rgba(47,109,246,0.22)]">
+                RW
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#111827]">RecordWise</p>
+                <p className="text-xs text-[#6b7280]">Trusted Records and Archive Workspace</p>
+              </div>
+            </Link>
 
-          <nav className="mt-8 space-y-2">
-            {navItems.map((item) => {
-              const isChildActive = item.children?.some((child) => child.route === currentRoute) ?? false
-              const isActive = item.route === currentRoute || isChildActive
-              const Icon = item.route ? routeIcons[item.route] : undefined
-              const isOpen = openGroups[item.label] ?? isChildActive
-              const baseClasses = `flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[15px] font-semibold transition ${
-                isActive
-                  ? 'bg-white text-[#1f5fe0] shadow-[0_12px_32px_rgba(47,109,246,0.12)] ring-1 ring-[#cfe0ff]'
-                  : 'text-[#334155] hover:bg-white/85 hover:text-[#0f172a]'
-              }`
-              const iconClasses = `flex h-10 w-10 items-center justify-center rounded-xl ${
-                isActive ? 'bg-[#eaf2ff] text-[#1f5fe0]' : 'bg-white/80 text-[#64748b]'
-              }`
+            <div className="mt-8 min-h-0 flex-1 overflow-y-auto pr-1">
+              <nav className="space-y-2">
+                {navItems.map((item) => {
+                  const isChildActive = item.children?.some((child) => child.route === currentRoute) ?? false
+                  const isActive = item.route === currentRoute || isChildActive
+                  const Icon = item.route ? routeIcons[item.route] : undefined
+                  const isOpen = openGroups[item.label] ?? isChildActive
+                  const baseClasses = `flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[15px] font-semibold transition ${
+                    isActive
+                      ? 'bg-white text-[#1f5fe0] shadow-[0_12px_32px_rgba(47,109,246,0.12)] ring-1 ring-[#cfe0ff]'
+                      : 'text-[#334155] hover:bg-white/85 hover:text-[#0f172a]'
+                  }`
+                  const iconClasses = `flex h-10 w-10 items-center justify-center rounded-xl ${
+                    isActive ? 'bg-[#eaf2ff] text-[#1f5fe0]' : 'bg-white/80 text-[#64748b]'
+                  }`
 
-              if (item.children?.length) {
-                const groupClasses = isOpen
-                  ? 'overflow-hidden rounded-[1.6rem] border border-[#d8e2f0] bg-white/90 shadow-[0_14px_30px_rgba(15,23,42,0.06)]'
-                  : ''
-                const buttonClasses = isOpen
-                  ? `${baseClasses} rounded-none border-0 shadow-none ring-0`
-                  : `${baseClasses}`
+                  if (item.children?.length) {
+                    const groupClasses = isOpen
+                      ? 'overflow-hidden rounded-[1.6rem] border border-[#d8e2f0] bg-white/90 shadow-[0_14px_30px_rgba(15,23,42,0.06)]'
+                      : ''
+                    const buttonClasses = isOpen
+                      ? `${baseClasses} rounded-none border-0 shadow-none ring-0`
+                      : baseClasses
 
-                return (
-                  <div key={item.label} className={groupClasses}>
-                    <button
-                      type="button"
-                      onClick={() => setOpenGroups((current) => ({ ...current, [item.label]: !isOpen }))}
-                      className={`${buttonClasses} w-full justify-between text-left`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className={iconClasses}>{Icon ? <Icon /> : <ArchiveIcon />}</span>
-                        <span className="leading-tight">{item.label}</span>
-                      </span>
-                      <span className={`text-xs transition ${isOpen ? 'rotate-180' : ''}`}>▼</span>
-                    </button>
+                    return (
+                      <div key={item.label} className={groupClasses}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenGroups((current) => ({ ...current, [item.label]: !isOpen }))}
+                          className={`${buttonClasses} w-full justify-between text-left`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <span className={iconClasses}>{Icon ? <Icon /> : <ArchiveIcon />}</span>
+                            <span className="leading-tight">{item.label}</span>
+                          </span>
+                          <span className={`text-xs transition ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+                        </button>
 
-                    {isOpen ? (
-                      <div className="border-t border-[#e2e8f0] px-4 pb-4 pt-3">
-                        <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Archive Views</div>
-                        <div className="space-y-2">
-                          {item.children.map((child) => {
-                            const isChildRouteActive = child.route === currentRoute
+                        {isOpen ? (
+                          <div className="border-t border-[#e2e8f0] px-4 pb-4 pt-3">
+                            <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">
+                              Archive Views
+                            </div>
+                            <div className="space-y-2">
+                              {item.children.map((child) => {
+                                const isChildRouteActive = child.route === currentRoute
 
-                            return (
-                              <NavLink
-                                key={child.label}
-                                to={child.href}
-                                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                                  isChildRouteActive
-                                    ? 'bg-[#f8fbff] text-[#1f5fe0] shadow-[0_10px_26px_rgba(47,109,246,0.08)] ring-1 ring-[#cfe0ff]'
-                                    : 'text-[#475569] hover:bg-[#f8fbff] hover:text-[#0f172a]'
-                                }`}
-                              >
-                                <span
-                                  className={`flex h-9 w-9 items-center justify-center rounded-xl ${
-                                    isChildRouteActive ? 'bg-[#eaf2ff] text-[#1f5fe0]' : 'bg-[#f8fafc] text-[#64748b]'
-                                  }`}
-                                >
-                                  <ArchiveItemIcon />
-                                </span>
-                                <span className="leading-tight">{child.label}</span>
-                              </NavLink>
-                            )
-                          })}
-                        </div>
+                                return (
+                                  <NavLink
+                                    key={child.label}
+                                    to={child.href}
+                                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                                      isChildRouteActive
+                                        ? 'bg-[#f8fbff] text-[#1f5fe0] shadow-[0_10px_26px_rgba(47,109,246,0.08)] ring-1 ring-[#cfe0ff]'
+                                        : 'text-[#475569] hover:bg-[#f8fbff] hover:text-[#0f172a]'
+                                    }`}
+                                  >
+                                    <span
+                                      className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                                        isChildRouteActive ? 'bg-[#eaf2ff] text-[#1f5fe0]' : 'bg-[#f8fafc] text-[#64748b]'
+                                      }`}
+                                    >
+                                      <ArchiveItemIcon />
+                                    </span>
+                                    <span className="leading-tight">{child.label}</span>
+                                  </NavLink>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </div>
-                )
-              }
+                    )
+                  }
 
-              return (
-                <NavLink key={item.label} to={item.href ?? '/dashboard'} className={baseClasses}>
-                  <span className={iconClasses}>{Icon ? <Icon /> : <DashboardIcon />}</span>
-                  <span className="leading-tight">{item.label}</span>
-                </NavLink>
-              )
-            })}
-          </nav>
+                  return (
+                    <NavLink key={item.label} to={item.href ?? '/dashboard'} className={baseClasses}>
+                      <span className={iconClasses}>{Icon ? <Icon /> : <DashboardIcon />}</span>
+                      <span className="leading-tight">{item.label}</span>
+                    </NavLink>
+                  )
+                })}
+              </nav>
+            </div>
 
-          <div className="mt-8 rounded-[1.5rem] border border-[#d8e2f0] bg-white/85 p-4 shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Session</p>
-            <p className="mt-3 text-sm font-semibold text-[#111827]">{user?.email ?? 'user@recordwise.app'}</p>
-            <p className="mt-1 text-sm text-[#6b7280]">
-              {user?.role === 'admin'
-                ? 'Admin workspace access is active.'
-                : user?.role === 'secretary'
-                  ? 'Secretary workspace access is active.'
-                  : 'Resident workspace access is active.'}
-            </p>
-            <button
-              type="button"
-              onClick={logout}
-              className="mt-4 w-full rounded-2xl border border-black/8 bg-[#f8fafc] px-4 py-3 text-sm font-semibold text-[#334155] transition hover:bg-white"
-            >
-              Sign out
-            </button>
+            <div className="mt-6 rounded-[1.5rem] border border-[#d8e2f0] bg-white/90 p-4 shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">Session</p>
+              <p className="mt-3 break-all text-sm font-semibold text-[#111827]">{user?.email ?? 'user@recordwise.app'}</p>
+              <p className="mt-1 text-sm text-[#6b7280]">
+                {user?.role === 'admin'
+                  ? 'Admin workspace access is active.'
+                  : user?.role === 'secretary'
+                    ? 'Secretary workspace access is active.'
+                    : 'Resident workspace access is active.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="mt-4 w-full rounded-2xl bg-[#111827] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1f2937]"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         </aside>
 

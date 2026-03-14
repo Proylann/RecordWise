@@ -13,6 +13,16 @@ const documentTypeOptions = [
   'Other',
 ]
 
+const archiveReasonOptions = [
+  'Compliance filing',
+  'Audit trail reference',
+  'Case documentation',
+  'Historical record keeping',
+  'Legal records retention',
+  'Administrative documentation',
+  'Other official archive purpose',
+]
+
 type CreatedRecordResponse = {
   record_id: string
   blockchain_tx_hash?: string | null
@@ -130,17 +140,22 @@ function SubmitRecordPage() {
 
             <div>
               <label htmlFor="description" className="mb-3 block text-xl font-semibold text-[#111827]">
-                Description
+                Reason
               </label>
-              <textarea
+              <select
                 id="description"
                 value={form.description}
                 onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                placeholder="Describe the document"
                 required
-                rows={5}
-                className="w-full resize-y rounded-2xl border border-[#d8deea] bg-[#fcfdff] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#2f6df6] focus:ring-4 focus:ring-[#2f6df6]/10"
-              />
+                className="w-full rounded-2xl border border-[#d8deea] bg-[#fcfdff] px-5 py-4 text-base text-[#111827] outline-none transition focus:border-[#2f6df6] focus:ring-4 focus:ring-[#2f6df6]/10"
+              >
+                <option value="">Select archive reason</option>
+                {archiveReasonOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

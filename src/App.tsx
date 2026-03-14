@@ -7,7 +7,9 @@ import BarangayRecordArchivesPage from './pages/BarangayRecordArchives'
 import CertificateIncidentArchivesPage from './pages/CertificateIncidentArchives'
 import AssistantWidget from './components/AssistantWidget'
 import DashboardPage from './pages/Dashboard'
+import ForgotPasswordPage from './pages/ForgotPassword'
 import LoginPage from './pages/Login'
+import LoginVerificationPage from './pages/LoginVerification'
 import AdminActivitiesPage from './pages/admin/AdminActivities'
 import AdminArchivesPage from './pages/admin/AdminArchives'
 import AdminIncidentsPage from './pages/admin/AdminIncidents'
@@ -99,10 +101,26 @@ function AppFrame() {
             }
           />
           <Route
+            path={appRoutes.loginVerify}
+            element={
+              <RequireGuest>
+                <LoginVerificationPage />
+              </RequireGuest>
+            }
+          />
+          <Route
             path={appRoutes.register}
             element={
               <RequireGuest>
                 <RegisterPage />
+              </RequireGuest>
+            }
+          />
+          <Route
+            path={appRoutes.forgotPassword}
+            element={
+              <RequireGuest>
+                <ForgotPasswordPage />
               </RequireGuest>
             }
           />
